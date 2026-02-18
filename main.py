@@ -42,7 +42,7 @@ if getattr(sys, 'frozen', False):
             os.environ['PROJ_LIB'] = proj_data_path
 
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
-                             QHBoxLayout, QLabel, QLineEdit, QPushButton, 
+                             QHBoxLayout, QGridLayout, QLabel, QLineEdit, QPushButton, 
                              QFileDialog, QComboBox, QProgressBar, QTextEdit,
                              QGroupBox, QMessageBox, QCheckBox)
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer
@@ -120,6 +120,17 @@ class MainWindow(QMainWindow):
             "GEBCO 2025": {
                 "url": "https://gis.ccom.unh.edu/server/rest/services/GEBCO2025/GEBCO_2025_IS/ImageServer",
                 "display_url": "https://gis.ccom.unh.edu/server/rest/services/GEBCO/GEBCO_2025_Depths_Haxby_GCS/MapServer",
+                "land_display_url": "https://gis.ccom.unh.edu/server/rest/services/GEBCO/GEBCO_2025_Land_Grey_GCS/MapServer",
+                "bathymetry_raster_function": "None",
+                "hillshade_raster_function": "None",
+                "default_extent": _world_4326,
+                "service_crs": "EPSG:4326",
+                "native_resolution_only": True,
+                "native_pixel_size_degrees": 0.004166666666666667,
+            },
+            "GEBCO 2025 TID": {
+                "url": "https://gis.ccom.unh.edu/server/rest/services/GEBCO2025/GEBCO_2025_TID_IS/ImageServer",
+                "display_url": "https://gis.ccom.unh.edu/server/rest/services/GEBCO/GEBCO_2025_TID_GCS/MapServer",
                 "land_display_url": "https://gis.ccom.unh.edu/server/rest/services/GEBCO/GEBCO_2025_Land_Grey_GCS/MapServer",
                 "bathymetry_raster_function": "None",
                 "hillshade_raster_function": "None",
@@ -216,13 +227,9 @@ class MainWindow(QMainWindow):
         
         # Selection info
         selection_group = QGroupBox("Selected Area")
-        selection_main_layout = QVBoxLayout()
+        selection_main_layout = QGridLayout()
         
         # Selection coordinates in GCS (EPSG:4326) only
-        selection_coords_layout = QHBoxLayout()
-        geographic_group = QGroupBox("Selected Area (GCS)")
-        geographic_layout = QVBoxLayout()
-        
         self.west_edit = QLineEdit()
         self.west_edit.setPlaceholderText("West")
         self.south_edit = QLineEdit()
@@ -238,34 +245,30 @@ class MainWindow(QMainWindow):
         self.east_edit.editingFinished.connect(self.on_geographic_changed)
         self.north_edit.editingFinished.connect(self.on_geographic_changed)
         
-        # West row
-        west_row = QHBoxLayout()
-        west_row.addWidget(QLabel("West:"))
-        west_row.addWidget(self.west_edit)
-        geographic_layout.addLayout(west_row)
+        # Layout in "+" shape (3x3 grid):
+        # Row 0, Col 1: North (top center)
+        north_layout = QHBoxLayout()
+        north_layout.addWidget(QLabel("North:"))
+        north_layout.addWidget(self.north_edit)
+        selection_main_layout.addLayout(north_layout, 0, 1)
         
-        # South row
-        south_row = QHBoxLayout()
-        south_row.addWidget(QLabel("South:"))
-        south_row.addWidget(self.south_edit)
-        geographic_layout.addLayout(south_row)
+        # Row 1, Col 0: West (middle left)
+        west_layout = QHBoxLayout()
+        west_layout.addWidget(QLabel("West:"))
+        west_layout.addWidget(self.west_edit)
+        selection_main_layout.addLayout(west_layout, 1, 0)
         
-        # East row
-        east_row = QHBoxLayout()
-        east_row.addWidget(QLabel("East:"))
-        east_row.addWidget(self.east_edit)
-        geographic_layout.addLayout(east_row)
+        # Row 1, Col 2: East (middle right)
+        east_layout = QHBoxLayout()
+        east_layout.addWidget(QLabel("East:"))
+        east_layout.addWidget(self.east_edit)
+        selection_main_layout.addLayout(east_layout, 1, 2)
         
-        # North row
-        north_row = QHBoxLayout()
-        north_row.addWidget(QLabel("North:"))
-        north_row.addWidget(self.north_edit)
-        geographic_layout.addLayout(north_row)
-        
-        geographic_group.setLayout(geographic_layout)
-        selection_coords_layout.addWidget(geographic_group)
-        
-        selection_main_layout.addLayout(selection_coords_layout)
+        # Row 2, Col 1: South (bottom center)
+        south_layout = QHBoxLayout()
+        south_layout.addWidget(QLabel("South:"))
+        south_layout.addWidget(self.south_edit)
+        selection_main_layout.addLayout(south_layout, 2, 1)
         
         selection_group.setLayout(selection_main_layout)
         right_layout.addWidget(selection_group)
@@ -454,16 +457,25 @@ class MainWindow(QMainWindow):
             self.map_widget.display_url = self.data_sources[self.current_data_source].get("display_url")
             self.map_widget.land_display_url = self.data_sources[self.current_data_source].get("land_display_url")
             
-            # Always set extent to REST endpoint service extent as a baseline
-            # This ensures the map shows exactly the bathymetry data bounds from the REST endpoint
-            # If there's a pending selection, zoom_to_selection will override it
-            self.log_message(f"Updating map extent to REST endpoint extent: {self.service_extent}")
-            self.map_widget.extent = self.service_extent
-            # Also update _requested_extent to ensure coordinate conversion is correct
-            # This ensures the map displays exactly the REST endpoint bounds, not a rounded or adjusted version
-            self.map_widget._requested_extent = self.service_extent
+            # Check if there's a pending selection to preserve
+            if hasattr(self, '_pending_selection') and self._pending_selection:
+                # Use the pending selection extent instead of full service extent
+                selection_extent = self._pending_selection
+                self.log_message(f"Preserving selection, will zoom to it: {selection_extent}")
+                self.map_widget.extent = selection_extent
+                self.map_widget._requested_extent = selection_extent
+            else:
+                # Always set extent to REST endpoint service extent as a baseline
+                # This ensures the map shows exactly the bathymetry data bounds from the REST endpoint
+                self.log_message(f"Updating map extent to REST endpoint extent: {self.service_extent}")
+                self.map_widget.extent = self.service_extent
+                # Also update _requested_extent to ensure coordinate conversion is correct
+                # This ensures the map displays exactly the REST endpoint bounds, not a rounded or adjusted version
+                self.map_widget._requested_extent = self.service_extent
+            
             # Update service extent in map widget so it can distinguish dataset bounds from user selection
             self.map_widget.service_extent = self.service_extent
+            
             # CRITICAL: Always update selected_bbox_world to REST endpoint extent if it matches default extent
             # This ensures the box shows the exact REST endpoint bounds, not the default extent
             # Check if selected_bbox_world is None OR if it matches the default extent (needs update)
@@ -472,15 +484,13 @@ class MainWindow(QMainWindow):
                 self.map_widget.selected_bbox_world is None or
                 self.map_widget.selected_bbox_world == default_extent
             )
-            if needs_update:
+            if needs_update and not (hasattr(self, '_pending_selection') and self._pending_selection):
                 self.log_message(f"Updating selected_bbox_world from {self.map_widget.selected_bbox_world} to REST endpoint extent {self.service_extent}")
                 self.map_widget.selected_bbox_world = self.service_extent
                 self.map_widget.set_selection_validity(True)
                 self.selected_bbox = self.service_extent
                 # Update coordinate display to show REST endpoint bounds
                 self.update_coordinate_display(*self.service_extent, update_map=False)
-            if hasattr(self, '_pending_selection') and self._pending_selection:
-                self.log_message(f"Preserving selection, will zoom to it after map loads")
             
             # CRITICAL: Always reload map with REST endpoint extent to ensure it shows exact bathymetry data bounds
             # Check if the map was loaded with a different extent (e.g., default extent)
@@ -504,8 +514,13 @@ class MainWindow(QMainWindow):
                 self.map_widget.service_extent = self.service_extent
                 self.log_message(f"Set default bounds to REST endpoint extent: {self.service_extent}")
             
+            # Check if there's a pending selection to restore
+            if hasattr(self, '_pending_selection') and self._pending_selection:
+                # Restore the selection - this will zoom to it and reload the map
+                self.log_message(f"Restoring pending selection: {self._pending_selection}")
+                QTimer.singleShot(300, lambda: self._restore_selection())
             # Force reload if URL changed (data source switch) or if extent differs
-            if url_changed or current_extent != self.service_extent or extent_matches_default:
+            elif url_changed or current_extent != self.service_extent or extent_matches_default:
                 if url_changed:
                     self.log_message(f"Data source URL changed, reloading map with new service...")
                 else:
@@ -1455,18 +1470,11 @@ class MainWindow(QMainWindow):
         # Get new data source extent
         new_service_extent = self.data_sources[data_source_name]["default_extent"]
         
-        # Check if current selection overlaps with new data source extent
+        # Always preserve the selected area when switching data sources
         saved_selection = None
         if hasattr(self, 'selected_bbox') and self.selected_bbox:
-            if self._bboxes_overlap(self.selected_bbox, new_service_extent):
-                # Selection overlaps with new data source - keep it
-                saved_selection = self.selected_bbox
-            else:
-                # Selection doesn't overlap - clear it
-                self.selected_bbox = None
-                if self.map_widget:
-                    self.map_widget.selected_bbox_world = None
-                    self.map_widget.clear_selection()
+            # Keep the selection regardless of overlap with new data source
+            saved_selection = self.selected_bbox
         
         # Update current data source
         self.current_data_source = data_source_name
@@ -1513,6 +1521,11 @@ class MainWindow(QMainWindow):
         if hasattr(self, '_pending_selection') and self._pending_selection:
             bbox = self._pending_selection
             self.selected_bbox = bbox
+            
+            # Update map widget's selected_bbox_world so the selection box is drawn
+            if self.map_widget:
+                self.map_widget.selected_bbox_world = bbox
+                self.map_widget.set_selection_validity(True)
             
             # Zoom to the selection to maintain visual size
             self.zoom_to_selection(bbox[0], bbox[1], bbox[2], bbox[3])
