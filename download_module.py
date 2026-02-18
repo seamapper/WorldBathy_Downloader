@@ -21,17 +21,20 @@ class BathymetryDownloader(QThread):
     error = pyqtSignal(str)  # Error message
     
     def __init__(self, base_url, bbox, output_path, output_crs="EPSG:3857", 
-                 pixel_size=None, max_size=14000, use_tile_download=False):
+                 pixel_size=None, max_size=14000, use_tile_download=False,
+                 bbox_in_4326=False, pixel_size_degrees=None):
         super().__init__()
         self.base_url = base_url
-        self.bbox = bbox  # (xmin, ymin, xmax, ymax) in EPSG:3857
+        self.bbox = bbox  # (xmin, ymin, xmax, ymax) in EPSG:3857 or 4326 when bbox_in_4326
         self.output_path = output_path
         self.output_crs = output_crs
-        self.pixel_size = pixel_size  # If None, use service default (4m)
-        self.max_size = max_size  # Maximum image size (width and height) from service
-        self.use_tile_download = use_tile_download  # Whether to use tiled downloads
-        self.tile_overlap = 5  # Number of pixels overlap between tiles
-        self.tile_max_size = 2000  # Maximum size for a single tile (pixels)
+        self.pixel_size = pixel_size  # meters, or None; ignored when pixel_size_degrees is set
+        self.bbox_in_4326 = bbox_in_4326
+        self.pixel_size_degrees = pixel_size_degrees  # for services in 4326 (e.g. GEBCO)
+        self.max_size = max_size
+        self.use_tile_download = use_tile_download
+        self.tile_overlap = 5
+        self.tile_max_size = 2000
         self.cancelled = False
         
     def cancel(self):
@@ -44,12 +47,14 @@ class BathymetryDownloader(QThread):
             xmin, ymin, xmax, ymax = self.bbox
             
             # Determine output size
-            if self.pixel_size:
+            if self.bbox_in_4326 and self.pixel_size_degrees is not None:
+                # Bbox is (lon_min, lat_min, lon_max, lat_max) in degrees
+                width = int((xmax - xmin) / self.pixel_size_degrees)
+                height = int((ymax - ymin) / abs(self.pixel_size_degrees))
+            elif self.pixel_size:
                 width = int((xmax - xmin) / self.pixel_size)
                 height = int((ymax - ymin) / self.pixel_size)
             else:
-                # Use service default pixel size (4m)
-                # Calculate appropriate size based on extent
                 width = int((xmax - xmin) / 4.0)
                 height = int((ymax - ymin) / 4.0)
                 
@@ -236,50 +241,44 @@ class BathymetryDownloader(QThread):
                 return
             
             # Determine CRS and bbox
-            source_crs = CRS.from_epsg(3857)  # Service uses Web Mercator
-            transform = None  # Initialize transform
-            
-            if self.output_crs == "EPSG:3857":
-                crs = CRS.from_epsg(3857)
-                output_bbox = self.bbox
-            elif self.output_crs == "EPSG:4326":
-                # Transform bbox to WGS84
-                transformer = pyproj.Transformer.from_crs("EPSG:3857", "EPSG:4326", always_xy=True)
-                lon_min, lat_min = transformer.transform(xmin, ymin)
-                lon_max, lat_max = transformer.transform(xmax, ymax)
-                output_bbox = (lon_min, lat_min, lon_max, lat_max)
+            transform = None
+            if self.bbox_in_4326 and self.output_crs == "EPSG:4326":
+                # Data and bbox already in WGS84; no reprojection
                 crs = CRS.from_epsg(4326)
-                
-                # Reproject the data array
-                self.status.emit("Reprojecting to WGS84...")
-                from rasterio.warp import reproject, Resampling, calculate_default_transform
-                
-                # Calculate transform for output
-                transform, output_width, output_height = calculate_default_transform(
-                    source_crs, crs, width, height, *self.bbox
-                )
-                
-                # Create output array
-                reprojected_array = np.zeros((output_height, output_width), dtype=img_array.dtype)
-                
-                # Reproject
-                source_transform = from_bounds(*self.bbox, width, height)
-                reproject(
-                    source=img_array,
-                    destination=reprojected_array,
-                    src_transform=source_transform,
-                    src_crs=source_crs,
-                    dst_transform=transform,
-                    dst_crs=crs,
-                    resampling=Resampling.bilinear
-                )
-                
-                img_array = reprojected_array
-                width = output_width
-                height = output_height
-            else:
-                crs = CRS.from_string(self.output_crs)
                 output_bbox = self.bbox
+            else:
+                source_crs = CRS.from_epsg(3857)
+                if self.output_crs == "EPSG:3857":
+                    crs = CRS.from_epsg(3857)
+                    output_bbox = self.bbox
+                elif self.output_crs == "EPSG:4326":
+                    transformer = pyproj.Transformer.from_crs("EPSG:3857", "EPSG:4326", always_xy=True)
+                    lon_min, lat_min = transformer.transform(xmin, ymin)
+                    lon_max, lat_max = transformer.transform(xmax, ymax)
+                    output_bbox = (lon_min, lat_min, lon_max, lat_max)
+                    crs = CRS.from_epsg(4326)
+                    self.status.emit("Reprojecting to WGS84...")
+                    from rasterio.warp import reproject, Resampling, calculate_default_transform
+                    transform, output_width, output_height = calculate_default_transform(
+                        source_crs, crs, width, height, *self.bbox
+                    )
+                    reprojected_array = np.zeros((output_height, output_width), dtype=img_array.dtype)
+                    source_transform = from_bounds(*self.bbox, width, height)
+                    reproject(
+                        source=img_array,
+                        destination=reprojected_array,
+                        src_transform=source_transform,
+                        src_crs=source_crs,
+                        dst_transform=transform,
+                        dst_crs=crs,
+                        resampling=Resampling.bilinear
+                    )
+                    img_array = reprojected_array
+                    width = output_width
+                    height = output_height
+                else:
+                    crs = CRS.from_string(self.output_crs)
+                    output_bbox = self.bbox
                 
             self.progress.emit(70)
             self.status.emit("Creating GeoTIFF...")

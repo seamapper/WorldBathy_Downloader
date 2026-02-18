@@ -8,48 +8,78 @@ import requests
 from io import BytesIO
 from PIL import Image
 import numpy as np
+import math
+import pyproj
+
+# Web Mercator constants for tile math (EPSG:3857)
+_WEB_MERCATOR_HALF = 20037508.34
+_TILE_SIZE = 256
 
 
 class BasemapLoader(QThread):
-    """Thread for loading basemap (World Imagery) tiles."""
+    """Load World Imagery basemap by fetching and compositing tiles from the tile endpoint.
+    View extent is in GCS (4326); tiles are in Web Mercator (3857) scheme."""
     tileLoaded = pyqtSignal(QPixmap)
     
-    def __init__(self, bbox, size):
+    def __init__(self, bbox_4326, size):
         super().__init__()
-        self.bbox = bbox  # (xmin, ymin, xmax, ymax)
+        self.bbox_4326 = bbox_4326  # (west, south, east, north) in degrees
         self.size = size  # (width, height)
-        self.basemap_url = "https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/export"
+        self.base_url = "https://wi.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/MapServer"
         
     def run(self):
-        """Load basemap tile from World Imagery service."""
         try:
-            xmin, ymin, xmax, ymax = self.bbox
+            west, south, east, north = self.bbox_4326
             width, height = self.size
-            
-            params = {
-                "bbox": f"{xmin},{ymin},{xmax},{ymax}",
-                "size": f"{width},{height}",
-                "format": "png",
-                "f": "image",
-                "transparent": "false"
-            }
-            
-            response = requests.get(self.basemap_url, params=params, timeout=30)
-            response.raise_for_status()
-            
-            # Load directly into QPixmap
+            # Clamp lat for 4326->3857 conversion (poles are infinite in 3857)
+            lat_limit = 85.0511287798066
+            south_c = max(south, -lat_limit)
+            north_c = min(north, lat_limit)
+            tr = pyproj.Transformer.from_crs("EPSG:4326", "EPSG:3857", always_xy=True)
+            xmin, ymin = tr.transform(west, south_c)
+            xmax, ymax = tr.transform(east, north_c)
+            # Choose level so that we need ~width/256 tiles (one tile ≈ 256 view pixels)
+            extent_merc_width = xmax - xmin
+            if extent_merc_width <= 0:
+                self.tileLoaded.emit(QPixmap())
+                return
+            # 2^level tiles span the world; we want tile_merc_width ≈ extent_merc_width / (width/256)
+            # tile_merc_width = 2 * _WEB_MERCATOR_HALF / 2^level  => 2^level = 2*_WEB_MERCATOR_HALF / tile_merc_width
+            tiles_wide = max(1, width / _TILE_SIZE)
+            tile_merc_width = extent_merc_width / tiles_wide
+            level = max(0, min(23, int(round(math.log2(2 * _WEB_MERCATOR_HALF / tile_merc_width)))))
+            n = 2 ** level
+            tile_merc_size = (2 * _WEB_MERCATOR_HALF) / n
+            col_min = int((xmin + _WEB_MERCATOR_HALF) / tile_merc_size)
+            col_max = int((xmax + _WEB_MERCATOR_HALF) / tile_merc_size)
+            row_min = int((_WEB_MERCATOR_HALF - ymax) / tile_merc_size)
+            row_max = int((_WEB_MERCATOR_HALF - ymin) / tile_merc_size)
+            col_min = max(0, min(col_min, n - 1))
+            col_max = max(0, min(col_max, n - 1))
+            row_min = max(0, min(row_min, n - 1))
+            row_max = max(0, min(row_max, n - 1))
+            cols = col_max - col_min + 1
+            rows = row_max - row_min + 1
+            composite = Image.new("RGB", (int(cols * _TILE_SIZE), int(rows * _TILE_SIZE)), (128, 128, 128))
+            for r in range(row_min, row_max + 1):
+                for c in range(col_min, col_max + 1):
+                    url = f"{self.base_url}/tile/{level}/{r}/{c}"
+                    try:
+                        resp = requests.get(url, timeout=15)
+                        resp.raise_for_status()
+                        tile_img = Image.open(BytesIO(resp.content)).convert("RGB")
+                        composite.paste(tile_img, ((c - col_min) * _TILE_SIZE, (r - row_min) * _TILE_SIZE))
+                    except Exception:
+                        pass
+            composite = composite.resize((width, height), Image.Resampling.LANCZOS)
             img_bytes = BytesIO()
-            img = Image.open(BytesIO(response.content))
-            img.save(img_bytes, format='PNG')
+            composite.save(img_bytes, format="PNG")
             img_bytes.seek(0)
-            
             pixmap = QPixmap()
-            pixmap.loadFromData(img_bytes.getvalue(), 'PNG')
-            
+            pixmap.loadFromData(img_bytes.getvalue(), "PNG")
             self.tileLoaded.emit(pixmap)
-            
         except Exception as e:
-            print(f"Error loading basemap: {e}")
+            print(f"Error loading basemap tiles: {e}")
             self.tileLoaded.emit(QPixmap())
 
 
@@ -154,6 +184,55 @@ class MapTileLoader(QThread):
             self.tileLoaded.emit(QPixmap(), *self.bbox)
 
 
+class MapServerLoader(QThread):
+    """Load a single image from an ArcGIS MapServer (e.g. GEBCO Haxby). Bbox in GCS (4326)."""
+    tileLoaded = pyqtSignal(QPixmap, float, float, float, float)  # pixmap, west, south, east, north
+
+    def __init__(self, map_server_url, bbox_4326, size):
+        super().__init__()
+        self.map_server_url = map_server_url.rstrip("/")
+        self.bbox_4326 = bbox_4326  # (west, south, east, north) in degrees
+        self.size = size
+
+    def run(self):
+        try:
+            west, south, east, north = self.bbox_4326
+            width, height = self.size
+            max_side = 4096
+            if width > max_side or height > max_side:
+                scale = min(max_side / width, max_side / height)
+                width = int(width * scale)
+                height = int(height * scale)
+            url = f"{self.map_server_url}/export"
+            params = {
+                "bbox": f"{west},{south},{east},{north}",
+                "bboxSR": "4326",
+                "size": f"{width},{height}",
+                "format": "png",
+                "f": "image",
+                "transparent": "false",
+            }
+            response = requests.get(url, params=params, timeout=60)
+            response.raise_for_status()
+            img = Image.open(BytesIO(response.content))
+            img_bytes = BytesIO()
+            img.save(img_bytes, format="PNG")
+            img_bytes.seek(0)
+            pixmap = QPixmap()
+            pixmap.loadFromData(img_bytes.getvalue(), "PNG")
+            if pixmap.isNull():
+                img_rgb = img.convert("RGB")
+                img_array = np.array(img_rgb, dtype=np.uint8)
+                h, w = img_array.shape[:2]
+                bytes_per_line = 3 * w
+                q_image = QImage(img_array.data, w, h, bytes_per_line, QImage.Format.Format_RGB888)
+                pixmap = QPixmap.fromImage(q_image.copy())
+            self.tileLoaded.emit(pixmap, west, south, east, north)
+        except Exception as e:
+            print(f"MapServerLoader error: {e}")
+            self.tileLoaded.emit(QPixmap(), *self.bbox_4326)
+
+
 class MapWidget(QWidget):
     """Interactive map widget for displaying bathymetry and selecting areas."""
     
@@ -168,10 +247,11 @@ class MapWidget(QWidget):
             self.selection_is_valid = is_valid
             self.update()  # Trigger repaint to update color
     
-    def __init__(self, base_url, initial_extent, parent=None, raster_function="Shaded Relief - Haxby - MD Hillshade 2", show_basemap=True, show_hillshade=True, use_blend=False, hillshade_raster_function="Multidirectional Hillshade 3x"):
+    def __init__(self, base_url, initial_extent, parent=None, raster_function="Shaded Relief - Haxby - MD Hillshade 2", show_basemap=True, show_hillshade=True, use_blend=False, hillshade_raster_function="Multidirectional Hillshade 3x", display_url=None):
         super().__init__(parent)
         self.base_url = base_url
-        self.extent = initial_extent  # (xmin, ymin, xmax, ymax)
+        self.display_url = display_url  # When set, map is drawn from this MapServer (e.g. GEBCO Haxby) instead of ImageServer layers
+        self.extent = initial_extent  # (west, south, east, north) in GCS (4326)
         self.current_pixmap = QPixmap()
         self.basemap_pixmap = QPixmap()
         self.hillshade_pixmap = QPixmap()
@@ -196,13 +276,13 @@ class MapWidget(QWidget):
         self._loading = False  # Flag to prevent multiple simultaneous loads
         self._active_loaders = []  # Track active loaders
         self._load_timer = None  # Timer for debouncing zoom operations
-        self.selected_bbox_world = None  # Store selected bbox in world coordinates for persistent display
+        self.selected_bbox_world = None  # (west, south, east, north) in GCS (4326)
         self.selection_is_valid = True  # Track if selection is within size limits (True = valid/green, False = too large/red)
         self.service_extent = None  # Store service extent to distinguish dataset bounds from user selection
         self._extent_locked = False  # Flag to prevent extent changes during resize
         self._original_pixmap_size = None  # Store original pixmap size before scaling for coordinate conversion
         self._scaled_pixmap_size = None  # Store scaled pixmap size (what's actually drawn)
-        self._requested_extent = initial_extent  # Initialize to initial extent for accurate coordinate conversion from the start
+        self._requested_extent = initial_extent  # (west, south, east, north) GCS
         print(f"MapWidget initialized with raster function: {self.raster_function}, show_basemap: {self.show_basemap}, show_hillshade: {self.show_hillshade}, use_blend: {self.use_blend}")
         
         # Set a smaller minimum size to allow 60/40 split (60% of 1200 = 720px)
@@ -384,7 +464,27 @@ class MapWidget(QWidget):
         # Store the requested extent so we can restore it after loading
         self._requested_extent = requested_extent
         
-        # Load basemap if enabled
+        # When display_url is set (e.g. GEBCO MapServer), use GCS extent: basemap + display layer
+        if self.display_url:
+            if self.show_basemap:
+                print("Loading basemap (GCS)...")
+                self.basemap_loader = BasemapLoader(requested_extent, size)
+                self.basemap_loader.tileLoaded.connect(self.on_basemap_loaded)
+                self.basemap_loader.finished.connect(self._check_all_loaders_finished)
+                self._active_loaders.append(self.basemap_loader)
+                self.basemap_loader.start()
+            print("Loading display layer (GCS)...")
+            self.loader = MapServerLoader(self.display_url, requested_extent, size)
+            self.loader.tileLoaded.connect(self.on_tile_loaded)
+            self.loader.finished.connect(self.on_loader_finished)
+            self.loader.finished.connect(self._check_all_loaders_finished)
+            self._active_loaders.append(self.loader)
+            self.loader.start()
+            self.map_loaded = True
+            print("=" * 50)
+            return
+        
+        # Load basemap if enabled (non-display_url path)
         if self.show_basemap:
             print("Loading basemap...")
             self.basemap_loader = BasemapLoader(requested_extent, size)
@@ -965,11 +1065,10 @@ class MapWidget(QWidget):
                 bbox_screen = self.world_bbox_to_screen_rect(self.selected_bbox_world)
                 if bbox_screen:
                     # Determine if this is the dataset bounds (service extent) or a user selection
-                    # Use approximate comparison due to floating point precision differences
                     is_dataset_bounds = False
                     if hasattr(self, 'service_extent') and self.service_extent is not None:
-                        # Compare with tolerance for floating point precision
-                        tol = 0.1  # 0.1 meter tolerance
+                        # Compare with tolerance (degrees for GCS)
+                        tol = 1e-5
                         se = self.service_extent
                         sb = self.selected_bbox_world
                         if (abs(se[0] - sb[0]) < tol and abs(se[1] - sb[1]) < tol and

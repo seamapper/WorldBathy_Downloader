@@ -50,7 +50,6 @@ from map_widget import MapWidget
 from download_module import BathymetryDownloader
 import requests
 import json
-import pyproj
 from datetime import datetime
 
 
@@ -115,21 +114,21 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         # Data source configurations
+        # GEBCO 2025: everything in GCS (EPSG:4326), full extent to poles
+        _world_4326 = (-180.0, -90.0, 180.0, 90.0)
         self.data_sources = {
-            "WGOM-LI-SNE Hi Resolution": {
-                "url": "https://gis.ccom.unh.edu/server/rest/services/WGOM_LI_SNE/WGOM_LI_SNE_BTY_4m_20231005_WMAS_2_IS/ImageServer",
-                "bathymetry_raster_function": "StdDev - BlueGreen",
-                "hillshade_raster_function": "Multidirectional Hillshade 3x",
-                "default_extent": (-8254538.5, 4898559.25, -7411670.5, 5636075.25)
-            },
-            "WGOM-LI-SNE Regional": {
-                "url": "https://gis.ccom.unh.edu/server/rest/services/WGOM_LI_SNE/WGOM_LI_SNE_BTY_20231004_16m_2_WMAS_IS/ImageServer",
-                "bathymetry_raster_function": "StdDev - BlueGreen",
-                "hillshade_raster_function": "Multidirectional Hillshade 3x",
-                "default_extent": ( -8313630.50001078, 4898555.25001255, -7411662.50001078, 5636075.25001255)
+            "GEBCO 2025": {
+                "url": "https://gis.ccom.unh.edu/server/rest/services/GEBCO2025/GEBCO_2025_IS/ImageServer",
+                "display_url": "https://gis.ccom.unh.edu/server/rest/services/GEBCO/GEBCO_2025_Depths_Haxby_GCS/MapServer",
+                "bathymetry_raster_function": "None",
+                "hillshade_raster_function": "None",
+                "default_extent": _world_4326,
+                "service_crs": "EPSG:4326",
+                "native_resolution_only": True,
+                "native_pixel_size_degrees": 0.004166666666666667,
             }
         }
-        self.current_data_source = "WGOM-LI-SNE Hi Resolution"  # Default data source
+        self.current_data_source = "GEBCO 2025"
         self.base_url = self.data_sources[self.current_data_source]["url"]
         # Use known extent as fallback (will be updated when service info loads)
         self.service_extent = self.data_sources[self.current_data_source]["default_extent"]
@@ -166,17 +165,7 @@ class MainWindow(QMainWindow):
         # Map controls
         map_controls = QHBoxLayout()
         
-        # Basemap and hillshade checkboxes (on the left)
-        self.basemap_checkbox = QCheckBox("Imagery Basemap")
-        self.basemap_checkbox.setChecked(True)
-        self.basemap_checkbox.stateChanged.connect(self.on_basemap_toggled)
-        map_controls.addWidget(self.basemap_checkbox)
-        
-        self.hillshade_checkbox = QCheckBox("Hillshade")
-        self.hillshade_checkbox.setChecked(True)  # On by default
-        self.hillshade_checkbox.stateChanged.connect(self.on_hillshade_toggled)
-        map_controls.addWidget(self.hillshade_checkbox)
-        
+        # Legend checkbox (on the left)
         self.legend_checkbox = QCheckBox("Legend")
         self.legend_checkbox.setChecked(False)  # Off by default
         self.legend_checkbox.stateChanged.connect(self.on_legend_toggled)
@@ -228,57 +217,9 @@ class MainWindow(QMainWindow):
         selection_group = QGroupBox("Selected Area")
         selection_main_layout = QVBoxLayout()
         
-        # Horizontal layout for coordinate groupboxes
+        # Selection coordinates in GCS (EPSG:4326) only
         selection_coords_layout = QHBoxLayout()
-        
-        # WebMercator groupbox (left)
-        webmercator_group = QGroupBox("WebMercator")
-        webmercator_layout = QVBoxLayout()
-        
-        self.xmin_edit = QLineEdit()
-        self.xmin_edit.setPlaceholderText("XMin")
-        self.ymin_edit = QLineEdit()
-        self.ymin_edit.setPlaceholderText("YMin")
-        self.xmax_edit = QLineEdit()
-        self.xmax_edit.setPlaceholderText("XMax")
-        self.ymax_edit = QLineEdit()
-        self.ymax_edit.setPlaceholderText("YMax")
-        
-        # XMin row
-        xmin_row = QHBoxLayout()
-        xmin_row.addWidget(QLabel("XMin:"))
-        xmin_row.addWidget(self.xmin_edit)
-        webmercator_layout.addLayout(xmin_row)
-        
-        # YMin row
-        ymin_row = QHBoxLayout()
-        ymin_row.addWidget(QLabel("YMin:"))
-        ymin_row.addWidget(self.ymin_edit)
-        webmercator_layout.addLayout(ymin_row)
-        
-        # XMax row
-        xmax_row = QHBoxLayout()
-        xmax_row.addWidget(QLabel("XMax:"))
-        xmax_row.addWidget(self.xmax_edit)
-        webmercator_layout.addLayout(xmax_row)
-        
-        # YMax row
-        ymax_row = QHBoxLayout()
-        ymax_row.addWidget(QLabel("YMax:"))
-        ymax_row.addWidget(self.ymax_edit)
-        webmercator_layout.addLayout(ymax_row)
-        
-        # Connect WebMercator field changes to update Geographic and map
-        self.xmin_edit.editingFinished.connect(self.on_webmercator_changed)
-        self.ymin_edit.editingFinished.connect(self.on_webmercator_changed)
-        self.xmax_edit.editingFinished.connect(self.on_webmercator_changed)
-        self.ymax_edit.editingFinished.connect(self.on_webmercator_changed)
-        
-        webmercator_group.setLayout(webmercator_layout)
-        selection_coords_layout.addWidget(webmercator_group)
-        
-        # Geographic groupbox (right)
-        geographic_group = QGroupBox("Geographic")
+        geographic_group = QGroupBox("Selected Area (GCS)")
         geographic_layout = QVBoxLayout()
         
         self.west_edit = QLineEdit()
@@ -290,7 +231,7 @@ class MainWindow(QMainWindow):
         self.north_edit = QLineEdit()
         self.north_edit.setPlaceholderText("North")
         
-        # Connect Geographic field changes to update WebMercator and map
+        # Connect GCS field changes to update map
         self.west_edit.editingFinished.connect(self.on_geographic_changed)
         self.south_edit.editingFinished.connect(self.on_geographic_changed)
         self.east_edit.editingFinished.connect(self.on_geographic_changed)
@@ -337,23 +278,22 @@ class MainWindow(QMainWindow):
         
         # Left side: Cell size selector (label and dropdown on same line)
         cell_size_row = QHBoxLayout()
-        cell_size_row.addWidget(QLabel("Cell Size (m):"))
+        self.cell_size_label = QLabel("Cell Size (m):")
+        cell_size_row.addWidget(self.cell_size_label)
         self.cell_size_combo = QComboBox()
-        # Initial values will be set when service info loads
-        # For now, use default values as placeholder
-        self.cell_size_combo.addItems(["4", "8", "16"])
-        self.cell_size_combo.setCurrentText("4")  # Default to first option
-        self.cell_size_combo.setMinimumWidth(100)  # Make dropdown wider
+        # Values set when service info loads; GEBCO 2025 uses "Native" only
+        self.cell_size_combo.addItems(["Native"])
+        self.cell_size_combo.setMinimumWidth(100)
         self.cell_size_combo.currentTextChanged.connect(self.on_cell_size_changed)
         cell_size_row.addWidget(self.cell_size_combo)
-        cell_size_row.addStretch()  # Push to left side
+        cell_size_row.addStretch()
         output_top_layout.addLayout(cell_size_row)
         
-        # Right side: Output CRS selector (label and dropdown on same line)
+        # Right side: Output CRS selector (GEBCO 2025 is 4326 only)
         crs_row = QHBoxLayout()
         crs_row.addWidget(QLabel("Output CRS:"))
         self.crs_combo = QComboBox()
-        self.crs_combo.addItems(["EPSG:3857", "EPSG:4326"])
+        self.crs_combo.addItems(["EPSG:4326"])
         crs_row.addWidget(self.crs_combo)
         crs_row.addStretch()  # Push to right side
         output_top_layout.addLayout(crs_row)
@@ -451,12 +391,22 @@ class MainWindow(QMainWindow):
     def on_service_info_loaded(self, service_data):
         """Handle successful service info load."""
         extent_dict = service_data.get("extent", {})
-        self.service_extent = (
-            extent_dict["xmin"],
-            extent_dict["ymin"],
-            extent_dict["xmax"],
-            extent_dict["ymax"]
-        )
+        ds = self.data_sources.get(self.current_data_source, {})
+        if ds.get("service_crs") == "EPSG:4326":
+            # Keep extent in GCS (4326), full range to poles
+            self.service_extent = (
+                extent_dict["xmin"],
+                extent_dict["ymin"],
+                extent_dict["xmax"],
+                extent_dict["ymax"]
+            )
+        else:
+            self.service_extent = (
+                extent_dict["xmin"],
+                extent_dict["ymin"],
+                extent_dict["xmax"],
+                extent_dict["ymax"]
+            )
         self.log_message("Service info loaded successfully")
         self.log_message(f"REST endpoint extent (bathymetry data bounds): {self.service_extent}")
         
@@ -466,23 +416,18 @@ class MainWindow(QMainWindow):
         # Update cell size dropdown based on pixel size from service
         pixel_size_x = service_data.get("pixel_size_x")
         pixel_size_y = service_data.get("pixel_size_y")
-        # Store pixel sizes for use in raster function selection
         self.pixel_size_x = pixel_size_x
         self.pixel_size_y = pixel_size_y
-        if pixel_size_x is not None and pixel_size_y is not None:
-            # Base cell size is the larger of pixelSizeX and pixelSizeY
+        if ds.get("native_resolution_only"):
+            self._set_native_cell_size_only()
+        elif pixel_size_x is not None and pixel_size_y is not None:
             base_cell_size = max(abs(pixel_size_x), abs(pixel_size_y))
-            # Force highest resolution when data source is changing
             self.update_cell_size_options(base_cell_size, force_highest_resolution=self._data_source_changing)
         else:
-            # Fallback to default values if pixel size not available
             self.log_message("Warning: Pixel size not available from service, using default cell sizes")
-            self.update_cell_size_options(4.0, force_highest_resolution=self._data_source_changing)  # Default to 4m if pixel size unavailable
+            self.update_cell_size_options(4.0, force_highest_resolution=self._data_source_changing)
         
-        # Reset flag after updating cell size options
         self._data_source_changing = False
-        
-        # Raster function is fixed to "DAR - StdDev - BlueGreen" - no need to update combo box
         
         # Ensure map widget is initialized (this will remove loading label)
         if self.map_widget is None:
@@ -500,11 +445,12 @@ class MainWindow(QMainWindow):
             
             self.map_widget.base_url = self.base_url
             
-            # Update raster functions from current data source
+            # Update raster functions and display URL from current data source
             new_raster_function = self.data_sources[self.current_data_source]["bathymetry_raster_function"]
             new_hillshade_raster_function = self.data_sources[self.current_data_source]["hillshade_raster_function"]
             self.map_widget.raster_function = new_raster_function
             self.map_widget.hillshade_raster_function = new_hillshade_raster_function
+            self.map_widget.display_url = self.data_sources[self.current_data_source].get("display_url")
             
             # Always set extent to REST endpoint service extent as a baseline
             # This ensures the map shows exactly the bathymetry data bounds from the REST endpoint
@@ -539,12 +485,13 @@ class MainWindow(QMainWindow):
             current_extent = self.map_widget.extent
             default_extent = self.data_sources[self.current_data_source]["default_extent"]
             
-            # Check if map was loaded with default extent (needs reload with REST endpoint extent)
+            # Check if map was loaded with default extent (tolerance in degrees for GCS)
+            _tol = 1e-5
             extent_matches_default = (
-                abs(current_extent[0] - default_extent[0]) < 0.1 and
-                abs(current_extent[1] - default_extent[1]) < 0.1 and
-                abs(current_extent[2] - default_extent[2]) < 0.1 and
-                abs(current_extent[3] - default_extent[3]) < 0.1
+                abs(current_extent[0] - default_extent[0]) < _tol and
+                abs(current_extent[1] - default_extent[1]) < _tol and
+                abs(current_extent[2] - default_extent[2]) < _tol and
+                abs(current_extent[3] - default_extent[3]) < _tol
             )
             
             # Ensure default bounds are set
@@ -656,12 +603,12 @@ class MainWindow(QMainWindow):
                 # Get raster functions from current data source
                 raster_function = self.data_sources[self.current_data_source]["bathymetry_raster_function"]
                 hillshade_raster_function = self.data_sources[self.current_data_source]["hillshade_raster_function"]
-                show_basemap = self.basemap_checkbox.isChecked() if hasattr(self, 'basemap_checkbox') else True
-                show_hillshade = self.hillshade_checkbox.isChecked() if hasattr(self, 'hillshade_checkbox') else True
-                # Blend mode is automatically enabled when hillshade is enabled
-                use_blend = show_hillshade
-                self.log_message(f"Creating MapWidget with extent: {self.service_extent}, raster function: {raster_function}, show_basemap: {show_basemap}, show_hillshade: {show_hillshade}, use_blend: {use_blend}")
-                self.map_widget = MapWidget(self.base_url, self.service_extent, raster_function=raster_function, show_basemap=show_basemap, show_hillshade=show_hillshade, use_blend=use_blend, hillshade_raster_function=hillshade_raster_function)
+                show_basemap = False
+                show_hillshade = False
+                use_blend = False
+                self.log_message(f"Creating MapWidget with extent: {self.service_extent}, raster function: {raster_function}")
+                display_url = self.data_sources[self.current_data_source].get("display_url")
+                self.map_widget = MapWidget(self.base_url, self.service_extent, raster_function=raster_function, show_basemap=show_basemap, show_hillshade=show_hillshade, use_blend=use_blend, hillshade_raster_function=hillshade_raster_function, display_url=display_url)
                 self.map_widget.bathymetry_opacity = 1.0  # Full opacity
                 # Store service extent in map widget so it can distinguish dataset bounds from user selection
                 self.map_widget.service_extent = self.service_extent
@@ -792,32 +739,6 @@ class MainWindow(QMainWindow):
             
     # Raster function is fixed to "DAR - StdDev - BlueGreen" - no handler needed
             
-    def on_basemap_toggled(self, state):
-        """Handle basemap checkbox toggle."""
-        if self.map_widget:
-            show_basemap = (state == Qt.CheckState.Checked.value or state == 2)
-            self.map_widget.show_basemap = show_basemap
-            if show_basemap:
-                # Reload map to get basemap
-                self.map_widget.load_map()
-            else:
-                # Just update display
-                self.map_widget.update()
-                
-    def on_hillshade_toggled(self, state):
-        """Handle hillshade checkbox toggle."""
-        if self.map_widget:
-            show_hillshade = (state == Qt.CheckState.Checked.value or state == 2)
-            self.map_widget.show_hillshade = show_hillshade
-            # Automatically enable/disable blend mode based on hillshade state
-            self.map_widget.use_blend = show_hillshade
-            if show_hillshade:
-                # Reload map to get hillshade layer
-                self.map_widget.load_map()
-            else:
-                # Just update display (blend will be off automatically)
-                self.map_widget.update()
-    
     def on_legend_toggled(self, state):
         """Handle legend checkbox toggle."""
         if self.map_widget:
@@ -846,14 +767,24 @@ class MainWindow(QMainWindow):
                 self.map_widget.set_selection_validity(True)  # Default to valid (no selection shown)
             return
         
-        # Check if selection exceeds maximum size
+        # Check if selection exceeds maximum size (bbox is in GCS: west, south, east, north)
         try:
-            xmin, ymin, xmax, ymax = bbox
-            cell_size = float(self.cell_size_combo.currentText()) if hasattr(self, 'cell_size_combo') else 4.0
-            width_meters = xmax - xmin
-            height_meters = ymax - ymin
-            pixels_width = int(width_meters / cell_size)
-            pixels_height = int(height_meters / cell_size)
+            west, south, east, north = bbox
+            ds = self.data_sources.get(self.current_data_source, {})
+            if ds.get("native_resolution_only"):
+                deg_per_pixel = ds.get("native_pixel_size_degrees", 0.004166666666666667)
+                pixels_width = int((east - west) / deg_per_pixel)
+                pixels_height = int((north - south) / abs(deg_per_pixel))
+            else:
+                ct = self.cell_size_combo.currentText() if hasattr(self, 'cell_size_combo') else ""
+                try:
+                    cell_size = float(ct) if ct else 4.0
+                except ValueError:
+                    cell_size = 4.0
+                width_m = (east - west) * 111320 * 0.5
+                height_m = (north - south) * 110540
+                pixels_width = int(width_m / cell_size)
+                pixels_height = int(height_m / cell_size)
             
             # No size limit - always enable download button
             # Warning dialog will be shown when downloading large datasets
@@ -866,14 +797,12 @@ class MainWindow(QMainWindow):
             # Always enable download button (size limit removed with tiling support)
             self.download_btn.setEnabled(True)
             # Make text bold only if this is a user manual selection (not initial dataset bounds)
-            # Check if selection matches service extent (initial dataset bounds)
             is_initial_bounds = False
             if hasattr(self, 'service_extent') and self.service_extent:
                 se = self.service_extent
-                # Use tolerance for floating point comparison
-                tol = 0.1  # 0.1 meter tolerance
-                if (abs(se[0] - xmin) < tol and abs(se[1] - ymin) < tol and
-                    abs(se[2] - xmax) < tol and abs(se[3] - ymax) < tol):
+                tol = 1e-5  # degrees
+                if (abs(se[0] - west) < tol and abs(se[1] - south) < tol and
+                    abs(se[2] - east) < tol and abs(se[3] - north) < tol):
                     is_initial_bounds = True
             
             # Only make bold if it's NOT the initial dataset bounds
@@ -890,6 +819,18 @@ class MainWindow(QMainWindow):
             if self.map_widget:
                 self.map_widget.set_selection_validity(True)  # Default to valid on error
     
+    def _set_native_cell_size_only(self):
+        """Set cell size dropdown to single 'Native' option (for sources with native_resolution_only)."""
+        if not hasattr(self, 'cell_size_combo'):
+            return
+        if hasattr(self, 'cell_size_label'):
+            self.cell_size_label.setText("Resolution:")
+        self.cell_size_combo.clear()
+        self.cell_size_combo.addItems(["Native"])
+        if hasattr(self, 'selected_bbox') and self.selected_bbox:
+            xmin, ymin, xmax, ymax = self.selected_bbox
+            self.update_coordinate_display(xmin, ymin, xmax, ymax, update_map=False)
+    
     def update_cell_size_options(self, base_cell_size, force_highest_resolution=False):
         """Update cell size dropdown options based on base cell size from service.
         
@@ -899,6 +840,8 @@ class MainWindow(QMainWindow):
         """
         if not hasattr(self, 'cell_size_combo'):
             return
+        if hasattr(self, 'cell_size_label'):
+            self.cell_size_label.setText("Cell Size (m):")
         
         # Calculate the five options: base, 2x, 3x, 4x, 5x
         option1 = base_cell_size  # Highest resolution (smallest cell size)
@@ -944,40 +887,6 @@ class MainWindow(QMainWindow):
         # Update download button state
         self.check_and_update_download_button()
             
-    def on_webmercator_changed(self):
-        """Handle manual entry in WebMercator fields."""
-        if self._updating_coordinates:
-            return
-            
-        try:
-            # Get values from WebMercator fields
-            xmin_text = self.xmin_edit.text().strip()
-            ymin_text = self.ymin_edit.text().strip()
-            xmax_text = self.xmax_edit.text().strip()
-            ymax_text = self.ymax_edit.text().strip()
-            
-            # Check if all fields have values
-            if not (xmin_text and ymin_text and xmax_text and ymax_text):
-                return
-            
-            xmin = float(xmin_text)
-            ymin = float(ymin_text)
-            xmax = float(xmax_text)
-            ymax = float(ymax_text)
-            
-            # Validate that min < max
-            if xmin >= xmax or ymin >= ymax:
-                QMessageBox.warning(self, "Invalid Coordinates", "XMin must be less than XMax and YMin must be less than YMax.")
-                return
-            
-            # Update the selection
-            self.update_coordinate_display(xmin, ymin, xmax, ymax, update_map=True)
-            # Button state will be updated by update_coordinate_display
-            
-        except ValueError:
-            QMessageBox.warning(self, "Invalid Input", "Please enter valid numeric coordinates.")
-            self.check_and_update_download_button()  # Disable button on invalid input
-            
     def on_geographic_changed(self):
         """Handle manual entry in Geographic fields."""
         if self._updating_coordinates:
@@ -1003,103 +912,70 @@ class MainWindow(QMainWindow):
             if west >= east or south >= north:
                 QMessageBox.warning(self, "Invalid Coordinates", "West must be less than East and South must be less than North.")
                 return
-            
-            # Convert to WebMercator
-            try:
-                transformer = pyproj.Transformer.from_crs("EPSG:4326", "EPSG:3857", always_xy=True)
-                xmin, ymin = transformer.transform(west, south)
-                xmax, ymax = transformer.transform(east, north)
-                
-                # Update the selection
-                self.update_coordinate_display(xmin, ymin, xmax, ymax, update_map=True)
-                # Button state will be updated by update_coordinate_display
-            except Exception as e:
-                QMessageBox.warning(self, "Conversion Error", f"Error converting coordinates: {str(e)}")
-                self.check_and_update_download_button()  # Disable button on conversion error
-                
+            self.update_coordinate_display(west, south, east, north, update_map=True)
         except ValueError:
             QMessageBox.warning(self, "Invalid Input", "Please enter valid numeric coordinates.")
             self.check_and_update_download_button()  # Disable button on invalid input
             
-    def update_coordinate_display(self, xmin, ymin, xmax, ymax, update_map=True):
-        """Update both WebMercator and Geographic coordinate displays."""
+    def update_coordinate_display(self, west, south, east, north, update_map=True):
+        """Update GCS (West, South, East, North) display. All coordinates in 4326."""
         if self._updating_coordinates:
-            return  # Prevent recursive updates
-            
+            return
         self._updating_coordinates = True
-        
         try:
-            # Update WebMercator coordinates
-            self.xmin_edit.setText(f"{xmin:.2f}")
-            self.ymin_edit.setText(f"{ymin:.2f}")
-            self.xmax_edit.setText(f"{xmax:.2f}")
-            self.ymax_edit.setText(f"{ymax:.2f}")
-            
-            # Convert to Geographic (WGS84) coordinates
-            try:
-                transformer = pyproj.Transformer.from_crs("EPSG:3857", "EPSG:4326", always_xy=True)
-                west, south = transformer.transform(xmin, ymin)
-                east, north = transformer.transform(xmax, ymax)
-                
-                # Update Geographic coordinates
-                self.west_edit.setText(f"{west:.6f}")
-                self.south_edit.setText(f"{south:.6f}")
-                self.east_edit.setText(f"{east:.6f}")
-                self.north_edit.setText(f"{north:.6f}")
-            except Exception as e:
-                # If conversion fails, clear geographic fields
-                self.west_edit.clear()
-                self.south_edit.clear()
-                self.east_edit.clear()
-                self.north_edit.clear()
-            
-            # Update stored selection and map if requested
+            self.west_edit.setText(f"{west:.6f}")
+            self.south_edit.setText(f"{south:.6f}")
+            self.east_edit.setText(f"{east:.6f}")
+            self.north_edit.setText(f"{north:.6f}")
             if update_map:
-                self.selected_bbox = (xmin, ymin, xmax, ymax)
+                self.selected_bbox = (west, south, east, north)
                 if self.map_widget:
-                    self.zoom_to_selection(xmin, ymin, xmax, ymax)
+                    self.zoom_to_selection(west, south, east, north)
         finally:
             self._updating_coordinates = False
         
         # Update download button state
         self.check_and_update_download_button()
         
-        # Calculate expected number of pixels based on selected cell size (for download)
+        # Calculate expected number of pixels (bbox is in GCS: west, south, east, north)
         try:
-            width_meters = xmax - xmin
-            height_meters = ymax - ymin
-            # Get cell size from dropdown (default to 4 if not available)
-            if hasattr(self, 'cell_size_combo') and self.cell_size_combo.currentText():
-                cell_size = float(self.cell_size_combo.currentText())
+            ds = self.data_sources.get(self.current_data_source, {})
+            if ds.get("native_resolution_only"):
+                deg_per_pixel = ds.get("native_pixel_size_degrees", 0.004166666666666667)
+                pixels_width = int((east - west) / deg_per_pixel)
+                pixels_height = int((north - south) / abs(deg_per_pixel))
+                cell_size_label = "native"
             else:
-                cell_size = 4.0
+                width_meters = (east - west) * 111320 * 0.5  # approx at mid-lat
+                height_meters = (north - south) * 110540
+                ct = self.cell_size_combo.currentText() if hasattr(self, 'cell_size_combo') else ""
+                try:
+                    cell_size = float(ct) if ct else 4.0
+                except ValueError:
+                    cell_size = 4.0
+                pixels_width = int(width_meters / cell_size)
+                pixels_height = int(height_meters / cell_size)
+                cell_size_label = f"{cell_size}m"
             
-            pixels_width = int(width_meters / cell_size)
-            pixels_height = int(height_meters / cell_size)
             total_pixels = pixels_width * pixels_height
-            
-            # Format with thousand separators
             pixels_width_str = f"{pixels_width:,}"
             pixels_height_str = f"{pixels_height:,}"
             total_pixels_str = f"{total_pixels:,}"
-            
-            # Show warning for large datasets (> 10,000 pixels in a dimension)
             large_size_threshold = 10000
             is_large = pixels_width > large_size_threshold or pixels_height > large_size_threshold
             
             if is_large:
-                # Show warning in orange/yellow for large datasets
                 self.pixel_count_label.setText(
-                    f"⚠️ Pixels ({cell_size}m): {pixels_width_str} × {pixels_height_str} = {total_pixels_str} "
+                    f"⚠️ Pixels ({cell_size_label}): {pixels_width_str} × {pixels_height_str} = {total_pixels_str} "
                     f"(LARGE DATASET!)"
                 )
                 self.pixel_count_label.setStyleSheet("font-weight: bold; padding: 5px; color: orange;")
             else:
                 self.pixel_count_label.setText(
-                    f"Pixels ({cell_size}m): {pixels_width_str} × {pixels_height_str} = {total_pixels_str}"
+                    f"Pixels ({cell_size_label}): {pixels_width_str} × {pixels_height_str} = {total_pixels_str}"
                 )
                 self.pixel_count_label.setStyleSheet("font-weight: bold; padding: 5px;")
-        except Exception as e:
+        except Exception:
             self.pixel_count_label.setText("Pixels: --")
             self.pixel_count_label.setStyleSheet("font-weight: bold; padding: 5px;")
             
@@ -1107,10 +983,6 @@ class MainWindow(QMainWindow):
         """Handle selection change from map (during dragging)."""
         if xmin == 0 and ymin == 0 and xmax == 0 and ymax == 0:
             # Selection cleared
-            self.xmin_edit.clear()
-            self.ymin_edit.clear()
-            self.xmax_edit.clear()
-            self.ymax_edit.clear()
             self.west_edit.clear()
             self.south_edit.clear()
             self.east_edit.clear()
@@ -1193,9 +1065,7 @@ class MainWindow(QMainWindow):
                     center_y + new_height / 2
                 )
             else:
-                # Fallback to padded extent if widget size not available
                 new_extent = (padded_xmin, padded_ymin, padded_xmax, padded_ymax)
-            
             # Set the extent FIRST, then store the selection bbox
             # This ensures the selection bbox is stored with the correct extent context
             self.map_widget.extent = new_extent
@@ -1210,51 +1080,49 @@ class MainWindow(QMainWindow):
             self.map_widget.load_map()
             
     def start_download(self):
-        """Start downloading the selected area."""
-        # Get bbox from stored selection or manual entry
+        """Start downloading the selected area. Bbox is always in GCS (4326)."""
         bbox = None
-        
-        # First try to use stored selected bbox
         if hasattr(self, 'selected_bbox') and self.selected_bbox:
             bbox = self.selected_bbox
-        # Then try to get from map widget
         elif self.map_widget:
             bbox = self.map_widget.get_selection_bbox()
-        # Finally try manual entry
         else:
             try:
-                xmin_text = self.xmin_edit.text()
-                ymin_text = self.ymin_edit.text()
-                xmax_text = self.xmax_edit.text()
-                ymax_text = self.ymax_edit.text()
-                
-                # Check if fields have actual values (not just placeholders)
-                if xmin_text and ymin_text and xmax_text and ymax_text:
-                    bbox = (
-                        float(xmin_text),
-                        float(ymin_text),
-                        float(xmax_text),
-                        float(ymax_text)
-                    )
+                west_text = self.west_edit.text().strip()
+                south_text = self.south_edit.text().strip()
+                east_text = self.east_edit.text().strip()
+                north_text = self.north_edit.text().strip()
+                if west_text and south_text and east_text and north_text:
+                    bbox = (float(west_text), float(south_text), float(east_text), float(north_text))
             except ValueError:
                 QMessageBox.warning(self, "Invalid Input", "Please enter valid coordinates.")
                 return
-                
         if not bbox:
             QMessageBox.warning(self, "No Selection", "Please select an area on the map.")
             return
-            
         output_crs = self.crs_combo.currentText()
-        cell_size = float(self.cell_size_combo.currentText())  # Get cell size in meters
+        ds = self.data_sources.get(self.current_data_source, {})
+        native_only = ds.get("native_resolution_only", False)
+        if native_only:
+            # Bbox is (west, south, east, north) in 4326
+            bbox_4326 = bbox
+            lon_min, lat_min, lon_max, lat_max = bbox
+            pixel_size_degrees = ds.get("native_pixel_size_degrees", 0.004166666666666667)
+            pixels_width = int((lon_max - lon_min) / pixel_size_degrees)
+            pixels_height = int((lat_max - lat_min) / abs(pixel_size_degrees))
+            cell_size_for_filename = "native"
+        else:
+            xmin, ymin, xmax, ymax = bbox
+            try:
+                cell_size = float(self.cell_size_combo.currentText())
+            except ValueError:
+                cell_size = 4.0
+            width_meters = xmax - xmin
+            height_meters = ymax - ymin
+            pixels_width = int(width_meters / cell_size)
+            pixels_height = int(height_meters / cell_size)
+            cell_size_for_filename = int(cell_size)
         
-        # Calculate pixel dimensions
-        xmin, ymin, xmax, ymax = bbox
-        width_meters = xmax - xmin
-        height_meters = ymax - ymin
-        pixels_width = int(width_meters / cell_size)
-        pixels_height = int(height_meters / cell_size)
-        
-        # Warn user if downloading a very large dataset (> 10,000 x 10,000 pixels)
         large_size_threshold = 10000
         if pixels_width > large_size_threshold or pixels_height > large_size_threshold:
             total_pixels = pixels_width * pixels_height
@@ -1272,14 +1140,12 @@ class MainWindow(QMainWindow):
             msg.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel)
             msg.setDefaultButton(QMessageBox.StandardButton.Cancel)
             result = msg.exec()
-            
             if result == QMessageBox.StandardButton.Cancel:
-                return  # User cancelled
+                return
         
-        # Generate default filename: "GEBCO_Bathy_" + cell_size + "_" + date_time + ".tif"
         current_time = datetime.now()
         date_time_str = current_time.strftime("%Y-%m-%d_%H-%M-%S")
-        default_filename = f"GEBCO_Bathy_{int(cell_size)}m_{date_time_str}.tif"
+        default_filename = f"GEBCO_2025_{cell_size_for_filename}_{date_time_str}.tif" if native_only else f"GEBCO_Bathy_{cell_size_for_filename}m_{date_time_str}.tif"
         
         # Check if output directory has been selected
         if self.output_directory and os.path.isdir(self.output_directory):
@@ -1307,18 +1173,29 @@ class MainWindow(QMainWindow):
         # Get tile download setting
         use_tile_download = self.tile_download_checkbox.isChecked()
         
-        # Create downloader thread
-        # max_size is still used when tiling is disabled
-        max_size = 14000  # Maximum size for non-tiled downloads
-        self.downloader = BathymetryDownloader(
-            self.base_url,
-            bbox,
-            output_path,
-            output_crs,
-            pixel_size=cell_size,
-            max_size=max_size,
-            use_tile_download=use_tile_download
-        )
+        max_size = 14000
+        if native_only:
+            self.downloader = BathymetryDownloader(
+                self.base_url,
+                bbox_4326,
+                output_path,
+                output_crs,
+                pixel_size=None,
+                max_size=max_size,
+                use_tile_download=use_tile_download,
+                bbox_in_4326=True,
+                pixel_size_degrees=pixel_size_degrees
+            )
+        else:
+            self.downloader = BathymetryDownloader(
+                self.base_url,
+                bbox,
+                output_path,
+                output_crs,
+                pixel_size=cell_size,
+                max_size=max_size,
+                use_tile_download=use_tile_download
+            )
         self.downloader.progress.connect(self.progress_bar.setValue)
         self.downloader.status.connect(self.on_status_update)
         self.downloader.finished.connect(self.on_download_finished)
@@ -1532,7 +1409,7 @@ class MainWindow(QMainWindow):
             "To select an area:",
             "  1. Click and drag with the left mouse button on the map",
             "  2. The selected area will be shown with a purple dashed box",
-            "  3. You can also manually enter coordinates in the WebMercator or Geographic fields",
+            "  3. You can also manually enter coordinates in the West/South/East/North (GCS) fields",
             "",
             "To download the selected area:",
             "  1. Select an area on the map (or enter coordinates)",
