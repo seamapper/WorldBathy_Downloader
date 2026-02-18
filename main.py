@@ -120,6 +120,7 @@ class MainWindow(QMainWindow):
             "GEBCO 2025": {
                 "url": "https://gis.ccom.unh.edu/server/rest/services/GEBCO2025/GEBCO_2025_IS/ImageServer",
                 "display_url": "https://gis.ccom.unh.edu/server/rest/services/GEBCO/GEBCO_2025_Depths_Haxby_GCS/MapServer",
+                "land_display_url": "https://gis.ccom.unh.edu/server/rest/services/GEBCO/GEBCO_2025_Land_Grey_GCS/MapServer",
                 "bathymetry_raster_function": "None",
                 "hillshade_raster_function": "None",
                 "default_extent": _world_4326,
@@ -451,6 +452,7 @@ class MainWindow(QMainWindow):
             self.map_widget.raster_function = new_raster_function
             self.map_widget.hillshade_raster_function = new_hillshade_raster_function
             self.map_widget.display_url = self.data_sources[self.current_data_source].get("display_url")
+            self.map_widget.land_display_url = self.data_sources[self.current_data_source].get("land_display_url")
             
             # Always set extent to REST endpoint service extent as a baseline
             # This ensures the map shows exactly the bathymetry data bounds from the REST endpoint
@@ -608,7 +610,8 @@ class MainWindow(QMainWindow):
                 use_blend = False
                 self.log_message(f"Creating MapWidget with extent: {self.service_extent}, raster function: {raster_function}")
                 display_url = self.data_sources[self.current_data_source].get("display_url")
-                self.map_widget = MapWidget(self.base_url, self.service_extent, raster_function=raster_function, show_basemap=show_basemap, show_hillshade=show_hillshade, use_blend=use_blend, hillshade_raster_function=hillshade_raster_function, display_url=display_url)
+                land_display_url = self.data_sources[self.current_data_source].get("land_display_url")
+                self.map_widget = MapWidget(self.base_url, self.service_extent, raster_function=raster_function, show_basemap=show_basemap, show_hillshade=show_hillshade, use_blend=use_blend, hillshade_raster_function=hillshade_raster_function, display_url=display_url, land_display_url=land_display_url)
                 self.map_widget.bathymetry_opacity = 1.0  # Full opacity
                 # Store service extent in map widget so it can distinguish dataset bounds from user selection
                 self.map_widget.service_extent = self.service_extent

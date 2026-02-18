@@ -188,11 +188,12 @@ class MapServerLoader(QThread):
     """Load a single image from an ArcGIS MapServer (e.g. GEBCO Haxby). Bbox in GCS (4326)."""
     tileLoaded = pyqtSignal(QPixmap, float, float, float, float)  # pixmap, west, south, east, north
 
-    def __init__(self, map_server_url, bbox_4326, size):
+    def __init__(self, map_server_url, bbox_4326, size, transparent=False):
         super().__init__()
         self.map_server_url = map_server_url.rstrip("/")
         self.bbox_4326 = bbox_4326  # (west, south, east, north) in degrees
         self.size = size
+        self.transparent = transparent  # Whether to request transparent PNG
 
     def run(self):
         try:
@@ -210,7 +211,7 @@ class MapServerLoader(QThread):
                 "size": f"{width},{height}",
                 "format": "png",
                 "f": "image",
-                "transparent": "false",
+                "transparent": "true" if self.transparent else "false",
             }
             response = requests.get(url, params=params, timeout=60)
             response.raise_for_status()
@@ -247,10 +248,11 @@ class MapWidget(QWidget):
             self.selection_is_valid = is_valid
             self.update()  # Trigger repaint to update color
     
-    def __init__(self, base_url, initial_extent, parent=None, raster_function="Shaded Relief - Haxby - MD Hillshade 2", show_basemap=True, show_hillshade=True, use_blend=False, hillshade_raster_function="Multidirectional Hillshade 3x", display_url=None):
+    def __init__(self, base_url, initial_extent, parent=None, raster_function="Shaded Relief - Haxby - MD Hillshade 2", show_basemap=True, show_hillshade=True, use_blend=False, hillshade_raster_function="Multidirectional Hillshade 3x", display_url=None, land_display_url=None):
         super().__init__(parent)
         self.base_url = base_url
         self.display_url = display_url  # When set, map is drawn from this MapServer (e.g. GEBCO Haxby) instead of ImageServer layers
+        self.land_display_url = land_display_url  # Land layer MapServer (e.g. GEBCO Land Grey) shown as basemap
         self.extent = initial_extent  # (west, south, east, north) in GCS (4326)
         self.current_pixmap = QPixmap()
         self.basemap_pixmap = QPixmap()
@@ -464,17 +466,20 @@ class MapWidget(QWidget):
         # Store the requested extent so we can restore it after loading
         self._requested_extent = requested_extent
         
-        # When display_url is set (e.g. GEBCO MapServer), use GCS extent: basemap + display layer
+        # When display_url is set (e.g. GEBCO MapServer), use GCS extent: land basemap + display layer
         if self.display_url:
-            if self.show_basemap:
-                print("Loading basemap (GCS)...")
-                self.basemap_loader = BasemapLoader(requested_extent, size)
-                self.basemap_loader.tileLoaded.connect(self.on_basemap_loaded)
+            if self.land_display_url:
+                print("Loading land basemap (GCS)...")
+                # Land layer: opaque (transparent=False) so it's always visible
+                self.basemap_loader = MapServerLoader(self.land_display_url, requested_extent, size, transparent=False)
+                # MapServerLoader emits (pixmap, west, south, east, north); extract just pixmap
+                self.basemap_loader.tileLoaded.connect(lambda pixmap, *args: self.on_basemap_loaded(pixmap))
                 self.basemap_loader.finished.connect(self._check_all_loaders_finished)
                 self._active_loaders.append(self.basemap_loader)
                 self.basemap_loader.start()
             print("Loading display layer (GCS)...")
-            self.loader = MapServerLoader(self.display_url, requested_extent, size)
+            # Bathymetry layer: transparent (transparent=True) so land shows through
+            self.loader = MapServerLoader(self.display_url, requested_extent, size, transparent=True)
             self.loader.tileLoaded.connect(self.on_tile_loaded)
             self.loader.finished.connect(self.on_loader_finished)
             self.loader.finished.connect(self._check_all_loaders_finished)
@@ -519,6 +524,14 @@ class MapWidget(QWidget):
     def on_basemap_loaded(self, pixmap):
         """Handle basemap tile loaded."""
         if not pixmap.isNull():
+            # Ensure basemap is fully opaque (remove alpha channel if present)
+            # Convert to QImage, then to RGB format to remove transparency
+            qimage = pixmap.toImage()
+            if qimage.hasAlphaChannel():
+                # Convert to RGB888 format (removes alpha channel, truly opaque)
+                qimage = qimage.convertToFormat(QImage.Format.Format_RGB888)
+                pixmap = QPixmap.fromImage(qimage)
+            
             widget_size = self.size()
             if widget_size.width() > 0 and widget_size.height() > 0:
                 if widget_size.width() == pixmap.width() and widget_size.height() == pixmap.height():
@@ -995,7 +1008,9 @@ class MapWidget(QWidget):
         widget_rect = self.rect()
         
         # Draw basemap first (if available) - bottom layer
-        if self.show_basemap and not self.basemap_pixmap.isNull():
+        # Draw if show_basemap is True OR if land_display_url is set (land layer for GEBCO)
+        should_draw_basemap = (self.show_basemap or self.land_display_url) and not self.basemap_pixmap.isNull()
+        if should_draw_basemap:
             basemap_rect = self.basemap_pixmap.rect()
             x = (widget_rect.width() - basemap_rect.width()) // 2
             y = (widget_rect.height() - basemap_rect.height()) // 2
