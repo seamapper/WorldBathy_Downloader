@@ -2,25 +2,27 @@
 GEBCO Bathymetry Downloader
 ==========================
 
-A PyQt6-based application for downloading bathymetry data from ArcGIS ImageServer
-REST endpoints and creating GeoTIFF files with interactive area selection.
+A PyQt6-based application for downloading GEBCO and other bathymetry data from
+ArcGIS ImageServer REST endpoints and creating GeoTIFF files with interactive
+area selection.
 
 Features:
-    - Interactive map widget with area selection
-    - World Imagery basemap support
-    - Bathymetry hillshade underlay layer
-    - Multiple raster function support
-    - Adjustable opacity and blend modes
+    - Interactive map widget with area selection and legend
+    - World Imagery basemap with bathymetry hillshade underlay
+    - Data sources: GEBCO 2025, GEBCO 2025 TID, and configurable legacy services
+    - Output data types: Combined Bathymetry & Land, Bathymetry Only, Land Only,
+      Direct Measurements Only (TID 10–20), Direct & Unknown Measurement Only (TID 10–20, 44, 70)
+    - Multiple output GeoTIFFs per download when using GEBCO 2025
     - Cell size selection (4m, 8m, 16m)
     - Coordinate system conversion (EPSG:3857, EPSG:4326)
-    - Maximum download size validation
-    - Automatic filename generation with timestamp
+    - Maximum download size validation and automatic filename generation
+    - Data set attribution with clickable DOI link for GEBCO 2025
 
 Author: Paul Johnson, Center for Coastal and Ocean Mapping, University of New Hampshire
-Date: December 12, 2025
+Date: February 2026
 
 License: BSD 3-Clause License
-Copyright (c) 2025, Center for Coastal and Ocean Mapping, University of New Hampshire
+Copyright (c) 2025–2026, Center for Coastal and Ocean Mapping, University of New Hampshire
 All rights reserved.
 
 See LICENSE file for full license text.

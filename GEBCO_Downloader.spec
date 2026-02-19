@@ -1,5 +1,23 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+# Extract version from main.py
+import re
+with open('main.py', 'r', encoding='utf-8') as f:
+    content = f.read()
+    # Find uncommented __version__ line (not starting with #)
+    lines = content.split('\n')
+    version = "unknown"
+    for line in lines:
+        stripped = line.strip()
+        # Skip commented lines
+        if stripped.startswith('#'):
+            continue
+        # Match __version__ = "version"
+        version_match = re.search(r"__version__\s*=\s*['\"]([^'\"]+)['\"]", stripped)
+        if version_match:
+            version = version_match.group(1)
+            break
+
 block_cipher = None
 
 a = Analysis(
@@ -8,13 +26,30 @@ a = Analysis(
     binaries=[],
     datas=[],
     hiddenimports=[
-        'PyQt6.QtCore',
-        'PyQt6.QtGui',
-        'PyQt6.QtWidgets',
         'rasterio',
+        'rasterio.sample',
+        'rasterio.vrt',
         'rasterio.warp',
         'rasterio.crs',
         'rasterio.transform',
+        'rasterio.windows',
+        'rasterio.env',
+        'rasterio.io',
+        'rasterio.session',
+        'rasterio.dtypes',
+        'rasterio.profiles',
+        'rasterio.coords',
+        'rasterio.errors',
+        'rasterio.enums',
+        'rasterio.drivers',
+        'rasterio._path',
+        'rasterio._base',
+        'rasterio._err',
+        'rasterio._io',
+        'rasterio._version',
+        'rasterio._vsiopener',
+        'rasterio._features',
+        'rasterio._warp',
         'numpy',
         'requests',
         'pyproj',
@@ -44,7 +79,7 @@ exe = EXE(
     a.zipfiles,
     a.datas,
     [],
-    name='GEBCO_Downloader',
+    name=f'GEBCO_Downloader_V{version}',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

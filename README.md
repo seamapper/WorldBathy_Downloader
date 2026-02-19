@@ -119,30 +119,35 @@ python main.py
 
 To create a standalone Windows executable (.exe) file:
 
-1. **Install PyInstaller** (if not already installed):
+1. **Ensure you're using the virtual environment Python**:
+   - The build script (`build_exe.bat`) automatically uses Python from `C:\Users\pjohnson\PycharmProjects\.venv\Scripts\python.exe`
+   - Make sure PyQt6 and all dependencies are installed in this virtual environment
+
+2. **Install PyInstaller** (if not already installed in the virtual environment):
    ```bash
-   pip install pyinstaller
+   C:\Users\pjohnson\PycharmProjects\.venv\Scripts\python.exe -m pip install pyinstaller
    ```
 
-2. **Run the build script**:
+3. **Run the build script**:
    ```bash
    build_exe.bat
    ```
    
    Or manually run PyInstaller:
    ```bash
-   pyinstaller GEBCO_Downloader.spec
+   C:\Users\pjohnson\PycharmProjects\.venv\Scripts\python.exe -m PyInstaller GEBCO_Downloader.spec --clean --noconfirm
    ```
 
-3. **Find the executable**: The built executable will be located in the `dist` folder as `GEBCO_Downloader.exe`
+4. **Find the executable**: The built executable will be located in the `dist` folder with a versioned name (e.g., `GEBCO_Downloader_V2026.2.exe`)
 
 The executable includes:
-- All required dependencies bundled
+- All required dependencies bundled (PyQt6, rasterio, numpy, pyproj, etc.)
 - The CCOM.ico icon from the `media` directory
 - No console window (GUI-only application)
 - Single-file distribution (all dependencies included)
+- Version number automatically extracted from `main.py` and included in the filename
 
-**Note**: The first build may take several minutes as PyInstaller analyzes and bundles all dependencies. Subsequent builds are faster.
+**Note**: The first build may take several minutes as PyInstaller analyzes and bundles all dependencies. Subsequent builds are faster. The build script uses the `GEBCO_Downloader.spec` file which includes necessary hidden imports for rasterio submodules.
 
 ## Usage
 
@@ -211,12 +216,12 @@ The **Data Set Attribution** groupbox appears below the Map panel and displays:
 Files are automatically named with the following pattern:
 
 - **GEBCO 2025**: `GEBCO_2025_<mode_name>_<timestamp>.tif`
-  - Mode name mappings:
+  - Mode name mappings (shortened names):
     - `combined` → `GEBCO_2025_combined_2026-02-17_14-30-45.tif`
-    - `bathymetry_only` → `GEBCO_2025_bathymetry_2026-02-17_14-30-45.tif`
-    - `land_only` → `GEBCO_2025_land_2026-02-17_14-30-45.tif`
-    - `direct_measurements_only` → `GEBCO_2025_direct_2026-02-17_14-30-45.tif`
-    - `direct_unknown_measurements_only` → `GEBCO_2025_direct_unknown_2026-02-17_14-30-45.tif`
+    - `bathymetry` → `GEBCO_2025_bathymetry_2026-02-17_14-30-45.tif` (from "Bathymetry Only")
+    - `land` → `GEBCO_2025_land_2026-02-17_14-30-45.tif` (from "Land Only")
+    - `direct` → `GEBCO_2025_direct_2026-02-17_14-30-45.tif` (from "Direct Measurements Only")
+    - `direct_unknown` → `GEBCO_2025_direct_unknown_2026-02-17_14-30-45.tif` (from "Direct & Unknown Measurement Only")
 
 - **GEBCO 2025 TID**: `GEBCO_2025_TID_<timestamp>.tif`
   - Example: `GEBCO_2025_TID_2026-02-17_14-30-45.tif`
@@ -255,7 +260,7 @@ The Type Identifier Dataset uses the following values:
 
 BSD 3-Clause License
 
-Copyright (c) 2025, Center for Coastal and Ocean Mapping, University of New Hampshire
+Copyright (c) 2025–2026, Center for Coastal and Ocean Mapping, University of New Hampshire
 All rights reserved.
 
 See LICENSE file for full license text.
@@ -266,9 +271,10 @@ Paul Johnson
 Center for Coastal and Ocean Mapping  
 University of New Hampshire
 
-## Version
+## Version History
 
-2026.1 - First release
+- **2026.2** - Enhanced with multiple output types, data attribution, improved UI, and executable build improvements
+- **2026.1** - First release
 
 ## Support
 
