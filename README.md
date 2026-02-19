@@ -294,12 +294,35 @@ Files are automatically named with the following pattern:
 
 ### TID Values
 
-The Type Identifier Dataset uses the following values:
-- **0**: Land
-- **10-20**: Direct measurements
-- **44**: Unknown measurement type
-- **70**: Unknown measurement type
-- **Other values**: Various interpolated and derived data sources
+The Type Identifier Dataset (TID) indicates the source type of each grid cell. The following values are used:
+
+| TID | Definition |
+|-----|------------|
+| **0** | Land |
+| **Direct measurements** | |
+| 10 | Singlebeam – depth value collected by a single beam echo-sounder |
+| 11 | Multibeam – depth value collected by a multibeam echo-sounder |
+| 12 | Seismic – depth value collected by seismic methods |
+| 13 | Isolated sounding – depth value that is not part of a regular survey or trackline |
+| 14 | ENC sounding – depth value extracted from an Electronic Navigation Chart (ENC) |
+| 15 | Lidar – depth derived from a bathymetric lidar sensor |
+| 16 | Depth measured by optical light sensor |
+| 17 | Combination of direct measurement methods |
+| **Indirect measurements** | |
+| 40 | Predicted based on satellite-derived gravity data – depth value is an interpolated value guided by satellite-derived gravity data |
+| 41 | Interpolated based on a computer algorithm – depth value is an interpolated value based on a computer algorithm (e.g. Generic Mapping Tools) |
+| 42 | Digital bathymetric contours from charts – depth value taken from a bathymetric contour data set |
+| 43 | Digital bathymetric contours from ENCs – depth value taken from bathymetric contours from an Electronic Navigation Chart (ENC) |
+| 44 | Depth value at this location is based on bathymetric depths from multiple sources including measured and derived data and included within a gridded data set where interpolation between sounding points is guided by satellite-derived gravity data |
+| 45 | Predicted based on helicopter/flight-derived gravity data |
+| 46 | Depth estimated by calculating the draft of a grounded iceberg using satellite-derived freeboard measurement |
+| 47 | Depth derived from grounded Argo float data |
+| **Unknown** | |
+| 70 | Pre-generated grid – depth value is taken from a pre-generated grid that is based on mixed source data types, e.g. single beam, multibeam, interpolation etc. |
+| 71 | Unknown source – depth value from an unknown source |
+| 72 | Steering points – depth value used to constrain the grid in areas of poor data coverage |
+
+*GEBCO Grid, vertical and horizontal datum.*
 
 ## License
 

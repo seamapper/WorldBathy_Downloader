@@ -3,7 +3,7 @@ REM Build script for GEBCO Bathymetry Downloader
 REM This script creates a Windows executable using PyInstaller
 
 echo Building GEBCO Bathymetry Downloader executable...
-echo.
+echo(
 
 REM Use Python from virtual environment
 set VENV_PYTHON=C:\Users\pjohnson\PycharmProjects\.venv\Scripts\python.exe
@@ -35,8 +35,8 @@ if errorlevel 1 (
     echo WARNING: PyQt6 is not installed in this Python environment.
     echo The executable will not work without PyQt6.
     echo Please install it: "%VENV_PYTHON%" -m pip install PyQt6
-    echo.
-    echo Press any key to continue anyway (build may fail)...
+    echo(
+    echo Press any key to continue anyway - build may fail...
     pause >nul
 )
 
@@ -49,15 +49,15 @@ echo Running PyInstaller...
 "%VENV_PYTHON%" -m PyInstaller GEBCO_Downloader.spec
 
 if errorlevel 1 (
-    echo.
+    echo(
     echo Build failed! Check the error messages above.
     pause
     exit /b 1
 )
 
-echo.
+echo(
 echo Build completed successfully!
 echo The executable name includes the version number from main.py
 echo The executable is located in the 'dist' folder.
-echo.
+echo(
 pause

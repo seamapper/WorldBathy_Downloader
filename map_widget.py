@@ -266,6 +266,7 @@ class MapWidget(QWidget):
         self.show_basemap = show_basemap
         self.show_hillshade = show_hillshade
         self.show_legend = True  # Legend visibility (on by default)
+        self.show_aoi = True  # Area of Interest (selection rectangle) visibility (on by default)
         self.use_blend = use_blend  # Use Multiply blend mode for top layer
         self.bathymetry_opacity = 1.0  # Opacity for bathymetry layer (0.0 to 1.0) - default 100%
         self.selection_start = None
@@ -1073,7 +1074,7 @@ class MapWidget(QWidget):
         # First draw the persistent selected bbox if it exists
         # CRITICAL: Only draw if pixmap is loaded and valid to avoid drawing with stale data during resize
         # Also ensure pixmap size matches widget size (or is being scaled correctly)
-        if self.selected_bbox_world and self.map_loaded and not self.current_pixmap.isNull():
+        if self.show_aoi and self.selected_bbox_world and self.map_loaded and not self.current_pixmap.isNull():
             # Only draw if pixmap is valid and has been loaded
             # Check that pixmap size is reasonable (not stale)
             pixmap_width = self.current_pixmap.width()
@@ -1097,7 +1098,7 @@ class MapWidget(QWidget):
                     painter.drawRect(bbox_screen)
         
         # Draw active selection rectangle (while dragging)
-        if self.selection_start and self.selection_end:
+        if self.show_aoi and self.selection_start and self.selection_end:
             selection_rect = QRect(self.selection_start, self.selection_end).normalized()
             pen = QPen(QColor(0, 255, 0), 2, Qt.PenStyle.DashLine)  # Green dashed line
             painter.setPen(pen)

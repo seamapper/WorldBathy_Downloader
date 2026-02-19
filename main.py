@@ -202,6 +202,12 @@ class MainWindow(QMainWindow):
         self.legend_checkbox.stateChanged.connect(self.on_legend_toggled)
         map_controls.addWidget(self.legend_checkbox)
         
+        # AOI checkbox (to the right of Legend)
+        self.aoi_checkbox = QCheckBox("AoI")
+        self.aoi_checkbox.setChecked(True)  # On by default
+        self.aoi_checkbox.stateChanged.connect(self.on_aoi_toggled)
+        map_controls.addWidget(self.aoi_checkbox)
+        
         # Buttons (to the right of checkboxes)
         self.fit_extent_btn = QPushButton("Zoom to Full Extent")
         self.fit_extent_btn.clicked.connect(self.fit_to_extent)
@@ -209,9 +215,12 @@ class MainWindow(QMainWindow):
         self.clear_selection_btn.clicked.connect(self.clear_selection)
         self.refresh_map_btn = QPushButton("Refresh Map")
         self.refresh_map_btn.clicked.connect(self.refresh_map)
+        self.save_map_btn = QPushButton("Save Map to PNG")
+        self.save_map_btn.clicked.connect(self.export_map_image)
         map_controls.addWidget(self.fit_extent_btn)
         map_controls.addWidget(self.clear_selection_btn)
         map_controls.addWidget(self.refresh_map_btn)
+        map_controls.addWidget(self.save_map_btn)
         map_controls.addStretch()
         
         # Raster function will be set based on data source
@@ -686,6 +695,7 @@ class MainWindow(QMainWindow):
                 # Sync legend visibility with checkbox state
                 if hasattr(self, 'legend_checkbox'):
                     self.map_widget.show_legend = self.legend_checkbox.isChecked()
+                    self.map_widget.show_aoi = self.aoi_checkbox.isChecked()
                 # Store service extent in map widget
                 self.map_widget.service_extent = self.service_extent
                 # Store pixel sizes for raster function selection
@@ -820,6 +830,14 @@ class MainWindow(QMainWindow):
         if self.map_widget:
             show_legend = (state == Qt.CheckState.Checked.value or state == 2)
             self.map_widget.show_legend = show_legend
+            # Just update display (no need to reload map)
+            self.map_widget.update()
+    
+    def on_aoi_toggled(self, state):
+        """Handle AOI checkbox toggle."""
+        if self.map_widget:
+            show_aoi = (state == Qt.CheckState.Checked.value or state == 2)
+            self.map_widget.show_aoi = show_aoi
             # Just update display (no need to reload map)
             self.map_widget.update()
                 
