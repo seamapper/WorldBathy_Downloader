@@ -1,6 +1,6 @@
-# Building the GEBCO Downloader Mac App
+# Building the WorldBathy Mac App
 
-This guide explains how to create a macOS application (.app bundle) from the GEBCO Bathymetry Downloader application.
+This guide explains how to create a macOS application (.app bundle) from the World Bathymetry Downloader application. The built app is named **WorldBathy_V** followed by the version from `main.py` (e.g. `WorldBathy_V2026.2.app`).
 
 ## Prerequisites
 
@@ -23,7 +23,7 @@ The easiest way to build the Mac app is to use the provided build script:
 1. Open Terminal
 2. Navigate to the project directory:
    ```bash
-   cd /path/to/GEBCO_Downloader
+   cd /path/to/your_project_folder
    ```
 3. Make the script executable (if needed):
    ```bash
@@ -193,7 +193,7 @@ If distributing outside the App Store, notarization is required for macOS 10.15+
 2. **Submit for notarization**:
    ```bash
    xcrun altool --notarize-app \
-     --primary-bundle-id "edu.unh.ccom.gebco-downloader" \
+     --primary-bundle-id "edu.unh.ccom.worldbathy" \
      --username "your-apple-id@example.com" \
      --password "@keychain:AC_PASSWORD" \
      --file WorldBathy_V2026.2.zip
@@ -324,7 +324,7 @@ To create a disk image (.dmg) for easy distribution:
 
 3. **Create the DMG**:
    ```bash
-   hdiutil create -volname "GEBCO Downloader" \
+   hdiutil create -volname "WorldBathy" \
      -srcfolder dmg_build \
      -ov -format UDZO \
      WorldBathy_V2026.2.dmg
@@ -340,13 +340,14 @@ To create a disk image (.dmg) for easy distribution:
 After building, you'll see:
 
 ```
-GEBCO_Downloader/
-├── build/              # Temporary build files (can be deleted)
-│   └── WorldBathy_V2026.2/
-├── dist/               # Final app bundle location
+<project_folder>/
+├── build/                    # Temporary build files (can be deleted)
+│   └── WorldBathy_Downloader/
+├── dist/                     # Final app bundle location
 │   └── WorldBathy_V2026.2.app
-├── WorldBathy_Downloader.spec  # PyInstaller configuration
-└── build_exe.sh        # Build script
+├── WorldBathy_Downloader.spec # PyInstaller configuration
+├── build_exe.sh              # Build script
+└── worldbathy_downloader_config.json  # App config (created at runtime if missing)
 ```
 
 ## Distribution
@@ -386,7 +387,7 @@ The spec file works cross-platform, but you may want Mac-specific tweaks:
        exe,
        name='WorldBathy_V2026.2',
        icon='media/CCOM.icns',
-       bundle_identifier='edu.unh.ccom.gebco-downloader',
+       bundle_identifier='edu.unh.ccom.worldbathy',
        info_plist={
            'NSHighResolutionCapable': 'True',
            'NSRequiresAquaSystemAppearance': 'False',
@@ -461,4 +462,4 @@ Building the Mac app is straightforward:
 2. Or manually: `pyinstaller WorldBathy_Downloader.spec --clean --noconfirm`
 3. Find the app in `dist/WorldBathy_V<version>.app`
 
-The app is self-contained and ready for distribution. For production distribution, consider code signing and notarization.
+The app is self-contained and ready for distribution. At runtime it reads/writes settings (e.g. output directory) from `worldbathy_downloader_config.json` in the same directory as the .app (or in the current working directory when launched). For production distribution, consider code signing and notarization.

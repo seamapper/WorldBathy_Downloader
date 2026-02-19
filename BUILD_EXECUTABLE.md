@@ -1,6 +1,6 @@
-# Building the GEBCO Downloader Executable
+# Building the WorldBathy Executable
 
-This guide explains how to create a standalone Windows executable (.exe) file from the GEBCO Bathymetry Downloader application.
+This guide explains how to create a standalone Windows executable (.exe) file from the World Bathymetry Downloader application. The built executable is named **WorldBathy_V** followed by the version from `main.py` (e.g. `WorldBathy_V2026.2.exe`).
 
 ## Prerequisites
 
@@ -25,7 +25,7 @@ The easiest way to build the executable is to use the provided build script:
 1. Open a command prompt or PowerShell window
 2. Navigate to the project directory:
    ```bash
-   cd C:\Users\pjohnson\PycharmProjects\GEBCO_Downloader
+   cd C:\Users\pjohnson\PycharmProjects\WorldBathy_Downloader
    ```
 3. Run the build script:
    ```bash
@@ -189,13 +189,14 @@ Some Python packages (like rasterio) use dynamic imports that PyInstaller cannot
 After building, you'll see:
 
 ```
-GEBCO_Downloader/
-├── build/              # Temporary build files (can be deleted)
-│   └── GEBCO_Downloader/
-├── dist/               # Final executable location
+<project_folder>/
+├── build/                    # Temporary build files (can be deleted)
+│   └── WorldBathy_Downloader/
+├── dist/                     # Final executable location
 │   └── WorldBathy_V2026.2.exe
-├── WorldBathy_Downloader.spec  # PyInstaller configuration
-└── build_exe.bat       # Build script
+├── WorldBathy_Downloader.spec # PyInstaller configuration
+├── build_exe.bat             # Build script
+└── worldbathy_downloader_config.json  # App config (created at runtime if missing)
 ```
 
 ## Distribution
@@ -259,7 +260,7 @@ To update the version:
 Building the executable is straightforward:
 
 1. Use the build script: `build_exe.bat`
-2. Or manually: `python -m PyInstaller WorldBathy_Downloader.spec --clean --noconfirm`
+2. Or manually: `C:\Users\pjohnson\PycharmProjects\.venv\Scripts\python.exe -m PyInstaller WorldBathy_Downloader.spec --clean --noconfirm` (adjust the Python path if your venv is elsewhere)
 3. Find the executable in `dist\WorldBathy_V<version>.exe`
 
-The executable is self-contained and ready for distribution!
+The executable is self-contained and ready for distribution. At runtime it reads/writes settings (e.g. output directory) from `worldbathy_downloader_config.json` in the same directory as the .exe.
