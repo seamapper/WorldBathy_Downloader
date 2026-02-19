@@ -2,6 +2,8 @@
 
 A PyQt6-based desktop application for downloading bathymetry data from ArcGIS ImageServer REST endpoints and creating GeoTIFF files with interactive area selection.
 
+![GEBCO Downloader](media/GEBCO_Downloader.jpg)
+
 ## Overview
 
 The GEBCO Bathymetry Downloader provides an intuitive graphical interface for selecting geographic areas and downloading bathymetry data from GEBCO (General Bathymetric Chart of the Oceans) datasets. The application supports multiple data sources and output formats, allowing users to extract specific subsets of bathymetry data based on measurement types.
