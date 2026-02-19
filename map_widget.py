@@ -259,7 +259,7 @@ class MapWidget(QWidget):
         self.hillshade_pixmap = QPixmap()
         self.show_basemap = show_basemap
         self.show_hillshade = show_hillshade
-        self.show_legend = False  # Legend visibility (off by default)
+        self.show_legend = True  # Legend visibility (on by default)
         self.use_blend = use_blend  # Use Multiply blend mode for top layer
         self.bathymetry_opacity = 1.0  # Opacity for bathymetry layer (0.0 to 1.0) - default 100%
         self.selection_start = None
@@ -280,7 +280,7 @@ class MapWidget(QWidget):
         self._load_timer = None  # Timer for debouncing zoom operations
         self.selected_bbox_world = None  # (west, south, east, north) in GCS (4326)
         self.selection_is_valid = True  # Track if selection is within size limits (True = valid/green, False = too large/red)
-        self.service_extent = None  # Store service extent to distinguish dataset bounds from user selection
+        self.service_extent = None  # Store service extent (for reference)
         self._extent_locked = False  # Flag to prevent extent changes during resize
         self._original_pixmap_size = None  # Store original pixmap size before scaling for coordinate conversion
         self._scaled_pixmap_size = None  # Store scaled pixmap size (what's actually drawn)
@@ -1079,22 +1079,9 @@ class MapWidget(QWidget):
             if pixmap_width > 0 and pixmap_height > 0:
                 bbox_screen = self.world_bbox_to_screen_rect(self.selected_bbox_world)
                 if bbox_screen:
-                    # Determine if this is the dataset bounds (service extent) or a user selection
-                    is_dataset_bounds = False
-                    if hasattr(self, 'service_extent') and self.service_extent is not None:
-                        # Compare with tolerance (degrees for GCS)
-                        tol = 1e-5
-                        se = self.service_extent
-                        sb = self.selected_bbox_world
-                        if (abs(se[0] - sb[0]) < tol and abs(se[1] - sb[1]) < tol and
-                            abs(se[2] - sb[2]) < tol and abs(se[3] - sb[3]) < tol):
-                            is_dataset_bounds = True
-                    
-                    if is_dataset_bounds:
-                        # Dataset bounds - use yellow dashed line (no fill)
-                        pen = QPen(QColor(255, 255, 0), 2, Qt.PenStyle.DashLine)  # Yellow dashed line
-                    elif self.selection_is_valid:
-                        # User selection - use green dashed line (no fill)
+                    # Draw selection rectangle based on validity
+                    if self.selection_is_valid:
+                        # Valid selection - use green dashed line (no fill)
                         pen = QPen(QColor(0, 255, 0), 2, Qt.PenStyle.DashLine)  # Green dashed line
                     else:
                         # Selection too large - use red dashed line (no fill)
@@ -1133,11 +1120,10 @@ class MapWidget(QWidget):
         legend_width = 150
         # Height calculation:
         # - Top padding: padding
-        # - Item 1: line_height
-        # - Item 2: line_height (text drawn at item_y + line_height - 4)
+        # - Item 1: line_height (text drawn at item_y + line_height - 4)
         # - Bottom padding: padding + 4 (extra space for text)
-        # Total: 2*padding + 2*line_height + 4
-        legend_height = padding * 2 + line_height * 2 + 4
+        # Total: 2*padding + line_height + 4
+        legend_height = padding * 2 + line_height + 4
         
         # Position in upper left corner
         x = margin
@@ -1154,9 +1140,8 @@ class MapWidget(QWidget):
         painter.setBrush(Qt.BrushStyle.NoBrush)
         painter.drawRect(legend_rect)
         
-        # Draw legend items (only Dataset Bounds and Area of Interest)
+        # Draw legend items (Area of Interest)
         items = [
-            (QColor(255, 255, 0), "Dataset Bounds"),
             (QColor(0, 255, 0), "Area of Interest")
         ]
         

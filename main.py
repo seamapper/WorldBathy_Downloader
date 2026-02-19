@@ -44,13 +44,25 @@ if getattr(sys, 'frozen', False):
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                              QHBoxLayout, QGridLayout, QLabel, QLineEdit, QPushButton, 
                              QFileDialog, QComboBox, QProgressBar, QTextEdit,
-                             QGroupBox, QMessageBox, QCheckBox)
-from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer
+                             QGroupBox, QMessageBox, QCheckBox, QSizePolicy)
+from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer, QUrl
+from PyQt6.QtGui import QDesktopServices, QMouseEvent
 from map_widget import MapWidget
 from download_module import BathymetryDownloader
 import requests
 import json
 from datetime import datetime
+
+
+class ClickableLabel(QLabel):
+    """A QLabel that emits a clicked signal when clicked."""
+    clicked = pyqtSignal()
+    
+    def mousePressEvent(self, event: QMouseEvent):
+        """Handle mouse press events."""
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.clicked.emit()
+        super().mousePressEvent(event)
 
 
 class ServiceInfoLoader(QThread):
@@ -127,6 +139,8 @@ class MainWindow(QMainWindow):
                 "service_crs": "EPSG:4326",
                 "native_resolution_only": True,
                 "native_pixel_size_degrees": 0.004166666666666667,
+                "attribution": "GEBCO Compilation Group (2025) GEBCO 2025 Grid (doi:10.5285/37c52e96-24ea-67ce-e063-7086abc05f29)",
+                "attribution_url": "https://www.bodc.ac.uk/data/published_data_library/catalogue/10.5285/37c52e96-24ea-67ce-e063-7086abc05f29",
             },
             "GEBCO 2025 TID": {
                 "url": "https://gis.ccom.unh.edu/server/rest/services/GEBCO2025/GEBCO_2025_TID_IS/ImageServer",
@@ -138,6 +152,8 @@ class MainWindow(QMainWindow):
                 "service_crs": "EPSG:4326",
                 "native_resolution_only": True,
                 "native_pixel_size_degrees": 0.004166666666666667,
+                "attribution": "GEBCO Compilation Group (2025) GEBCO 2025 Grid (doi:10.5285/37c52e96-24ea-67ce-e063-7086abc05f29)",
+                "attribution_url": "https://www.bodc.ac.uk/data/published_data_library/catalogue/10.5285/37c52e96-24ea-67ce-e063-7086abc05f29",
             }
         }
         self.current_data_source = "GEBCO 2025"
@@ -179,7 +195,7 @@ class MainWindow(QMainWindow):
         
         # Legend checkbox (on the left)
         self.legend_checkbox = QCheckBox("Legend")
-        self.legend_checkbox.setChecked(False)  # Off by default
+        self.legend_checkbox.setChecked(True)  # On by default
         self.legend_checkbox.stateChanged.connect(self.on_legend_toggled)
         map_controls.addWidget(self.legend_checkbox)
         
@@ -205,7 +221,31 @@ class MainWindow(QMainWindow):
         map_layout.addWidget(self.loading_label)
         
         self.map_group.setLayout(map_layout)
-        main_layout.addWidget(self.map_group)
+        
+        # Left side container (Map + Attribution)
+        left_container = QWidget()
+        left_container_layout = QVBoxLayout(left_container)
+        left_container_layout.setContentsMargins(0, 0, 0, 0)  # No margins
+        left_container_layout.addWidget(self.map_group)
+        
+        # Data Set Attribution (below Map groupbox)
+        attribution_group = QGroupBox("Data Set Attribution")
+        attribution_group.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)  # Fixed height, don't expand
+        attribution_group.setMaximumHeight(40)  # Constrain maximum height
+        attribution_layout = QVBoxLayout()
+        attribution_layout.setContentsMargins(2, 1, 2, 1)  # Very minimal margins (top/bottom: 1px)
+        attribution_layout.setSpacing(0)  # No spacing between items
+        self.attribution_label = ClickableLabel()
+        self.attribution_label.setWordWrap(True)
+        self.attribution_label.setStyleSheet("color: green; text-decoration: underline; cursor: pointer; padding: 0px; margin: 0px; border: none;")
+        self.attribution_label.setContentsMargins(0, 0, 0, 0)  # Remove any label margins
+        self.attribution_label.clicked.connect(self._open_attribution_url)
+        self._current_attribution_url = None  # Store current attribution URL
+        attribution_layout.addWidget(self.attribution_label)
+        attribution_group.setLayout(attribution_layout)
+        left_container_layout.addWidget(attribution_group)
+        
+        main_layout.addWidget(left_container)
         
         # Right panel - Controls
         right_panel = QWidget()
@@ -275,34 +315,40 @@ class MainWindow(QMainWindow):
         
         # Output options
         output_group = QGroupBox("Output Options")
-        output_layout = QVBoxLayout()  # Vertical layout to accommodate pixel count at bottom
+        output_layout = QVBoxLayout()
         
-        # Top row: Cell size and CRS side by side
-        output_top_layout = QHBoxLayout()
-        
-        # Left side: Cell size selector (label and dropdown on same line)
-        cell_size_row = QHBoxLayout()
-        self.cell_size_label = QLabel("Cell Size (m):")
-        cell_size_row.addWidget(self.cell_size_label)
-        self.cell_size_combo = QComboBox()
-        # Values set when service info loads; GEBCO 2025 uses "Native" only
-        self.cell_size_combo.addItems(["Native"])
-        self.cell_size_combo.setMinimumWidth(100)
-        self.cell_size_combo.currentTextChanged.connect(self.on_cell_size_changed)
-        cell_size_row.addWidget(self.cell_size_combo)
-        cell_size_row.addStretch()
-        output_top_layout.addLayout(cell_size_row)
-        
-        # Right side: Output CRS selector (GEBCO 2025 is 4326 only)
-        crs_row = QHBoxLayout()
-        crs_row.addWidget(QLabel("Output CRS:"))
-        self.crs_combo = QComboBox()
-        self.crs_combo.addItems(["EPSG:4326"])
-        crs_row.addWidget(self.crs_combo)
-        crs_row.addStretch()  # Push to right side
-        output_top_layout.addLayout(crs_row)
-        
-        output_layout.addLayout(output_top_layout)
+        # Output Data Types groupbox (GEBCO 2025 only): any combination of Combined, Bathymetry Only, Land Only, Direct Measurements Only
+        self.output_data_types_group = QGroupBox("Output Grid Data Types")
+        output_data_types_layout = QVBoxLayout()
+        self.download_mode_container = QWidget()
+        download_mode_layout = QGridLayout(self.download_mode_container)
+        self.check_combined = QCheckBox("Combined Bathymetry && Land")
+        self.check_combined.setChecked(True)
+        self.check_combined.setToolTip("Native grid with bathymetry and elevation")
+        download_mode_layout.addWidget(self.check_combined, 0, 0)
+        self.check_direct_measurements_only = QCheckBox("Direct Measurements")
+        self.check_direct_measurements_only.setToolTip("Only cells where TID is 10–20 (direct measurements)")
+        download_mode_layout.addWidget(self.check_direct_measurements_only, 0, 1)
+        self.check_direct_unknown_measurements_only = QCheckBox("Direct && Unknown Measurement")
+        self.check_direct_unknown_measurements_only.setToolTip("Only cells where TID is 10–20, 44, or 70 (direct and unknown measurements)")
+        download_mode_layout.addWidget(self.check_direct_unknown_measurements_only, 1, 1)
+        self.check_bathymetry_only = QCheckBox("Bathymetry")
+        self.check_bathymetry_only.setToolTip("Only cells where TID is not 0 (water)")
+        download_mode_layout.addWidget(self.check_bathymetry_only, 1, 0)
+        self.check_land_only = QCheckBox("Land")
+        self.check_land_only.setToolTip("Only cells where TID is 0 (land)")
+        download_mode_layout.addWidget(self.check_land_only, 2, 0)
+        for cb in (self.check_combined, self.check_bathymetry_only, self.check_land_only, self.check_direct_measurements_only, self.check_direct_unknown_measurements_only):
+            cb.toggled.connect(self.check_and_update_download_button)
+        self.check_direct_measurements_only.toggled.connect(
+            lambda checked: self.log_message("Only extracting bathymetry values with associated TID values from 10 to 17", bold=True) if checked else None
+        )
+        self.check_direct_unknown_measurements_only.toggled.connect(
+            lambda checked: self.log_message("Only extracting bathymetry values with TID 10 to 17, 44 and 70", bold=True) if checked else None
+        )
+        output_data_types_layout.addWidget(self.download_mode_container)
+        self.output_data_types_group.setLayout(output_data_types_layout)
+        output_layout.addWidget(self.output_data_types_group)
         
         # Pixel count display at the bottom
         self.pixel_count_label = QLabel("Pixels: --")
@@ -311,6 +357,9 @@ class MainWindow(QMainWindow):
         
         output_group.setLayout(output_layout)
         right_layout.addWidget(output_group)
+        
+        # Show download mode options only for GEBCO 2025 (not TID)
+        self._update_download_mode_visibility()
         
         # Output directory selection
         output_dir_btn = QPushButton("Select Output Directory")
@@ -369,6 +418,9 @@ class MainWindow(QMainWindow):
         
         log_group.setLayout(log_layout)
         right_layout.addWidget(log_group, 1)  # Add stretch factor to make it expand
+        
+        # Update attribution text based on current data source
+        self._update_attribution()
         
         main_layout.addWidget(right_panel)
         
@@ -473,7 +525,7 @@ class MainWindow(QMainWindow):
                 # This ensures the map displays exactly the REST endpoint bounds, not a rounded or adjusted version
                 self.map_widget._requested_extent = self.service_extent
             
-            # Update service extent in map widget so it can distinguish dataset bounds from user selection
+            # Update service extent in map widget
             self.map_widget.service_extent = self.service_extent
             
             # CRITICAL: Always update selected_bbox_world to REST endpoint extent if it matches default extent
@@ -628,7 +680,10 @@ class MainWindow(QMainWindow):
                 land_display_url = self.data_sources[self.current_data_source].get("land_display_url")
                 self.map_widget = MapWidget(self.base_url, self.service_extent, raster_function=raster_function, show_basemap=show_basemap, show_hillshade=show_hillshade, use_blend=use_blend, hillshade_raster_function=hillshade_raster_function, display_url=display_url, land_display_url=land_display_url)
                 self.map_widget.bathymetry_opacity = 1.0  # Full opacity
-                # Store service extent in map widget so it can distinguish dataset bounds from user selection
+                # Sync legend visibility with checkbox state
+                if hasattr(self, 'legend_checkbox'):
+                    self.map_widget.show_legend = self.legend_checkbox.isChecked()
+                # Store service extent in map widget
                 self.map_widget.service_extent = self.service_extent
                 # Store pixel sizes for raster function selection
                 self.map_widget.pixel_size_x = self.pixel_size_x
@@ -812,8 +867,11 @@ class MainWindow(QMainWindow):
             if self.map_widget:
                 self.map_widget.set_selection_validity(is_valid)
             
-            # Always enable download button (size limit removed with tiling support)
+            # Enable download button unless GEBCO 2025 with no output option selected
             self.download_btn.setEnabled(True)
+            if (self.current_data_source == "GEBCO 2025" and hasattr(self, 'check_combined') and
+                not (self.check_combined.isChecked() or self.check_bathymetry_only.isChecked() or self.check_land_only.isChecked() or self.check_direct_measurements_only.isChecked() or self.check_direct_unknown_measurements_only.isChecked())):
+                self.download_btn.setEnabled(False)
             # Make text bold only if this is a user manual selection (not initial dataset bounds)
             is_initial_bounds = False
             if hasattr(self, 'service_extent') and self.service_extent:
@@ -898,6 +956,8 @@ class MainWindow(QMainWindow):
     
     def on_cell_size_changed(self, cell_size_text):
         """Handle cell size change - update pixel count if selection exists."""
+        if not hasattr(self, 'cell_size_combo'):
+            return
         # Update pixel count display if there's a current selection
         if hasattr(self, 'selected_bbox') and self.selected_bbox:
             xmin, ymin, xmax, ymax = self.selected_bbox
@@ -930,7 +990,18 @@ class MainWindow(QMainWindow):
             if west >= east or south >= north:
                 QMessageBox.warning(self, "Invalid Coordinates", "West must be less than East and South must be less than North.")
                 return
-            self.update_coordinate_display(west, south, east, north, update_map=True)
+            
+            # Snap bounds to cell size grid
+            snapped_west, snapped_south, snapped_east, snapped_north, was_adjusted = self._snap_bounds_to_cell_size(west, south, east, north)
+            
+            if was_adjusted:
+                self.log_message(
+                    f"Selection bounds adjusted to align with cell size grid: "
+                    f"({west:.6f}, {south:.6f}, {east:.6f}, {north:.6f}) → "
+                    f"({snapped_west:.6f}, {snapped_south:.6f}, {snapped_east:.6f}, {snapped_north:.6f})"
+                )
+            
+            self.update_coordinate_display(snapped_west, snapped_south, snapped_east, snapped_north, update_map=True)
         except ValueError:
             QMessageBox.warning(self, "Invalid Input", "Please enter valid numeric coordinates.")
             self.check_and_update_download_button()  # Disable button on invalid input
@@ -984,13 +1055,13 @@ class MainWindow(QMainWindow):
             
             if is_large:
                 self.pixel_count_label.setText(
-                    f"⚠️ Pixels ({cell_size_label}): {pixels_width_str} × {pixels_height_str} = {total_pixels_str} "
+                    f"⚠️ Output Grid Pixels : {pixels_width_str} × {pixels_height_str} = {total_pixels_str} "
                     f"(LARGE DATASET!)"
                 )
                 self.pixel_count_label.setStyleSheet("font-weight: bold; padding: 5px; color: orange;")
             else:
                 self.pixel_count_label.setText(
-                    f"Pixels ({cell_size_label}): {pixels_width_str} × {pixels_height_str} = {total_pixels_str}"
+                    f"Output Grid Pixels : {pixels_width_str} × {pixels_height_str} = {total_pixels_str}"
                 )
                 self.pixel_count_label.setStyleSheet("font-weight: bold; padding: 5px;")
         except Exception:
@@ -1013,18 +1084,72 @@ class MainWindow(QMainWindow):
             self.update_coordinate_display(xmin, ymin, xmax, ymax, update_map=False)
             # Button state will be updated by update_coordinate_display (which calls check_and_update_download_button)
             
+    def _snap_bounds_to_cell_size(self, west, south, east, north):
+        """Snap bounding box to align with cell size grid.
+        
+        Returns:
+            tuple: (snapped_west, snapped_south, snapped_east, snapped_north, was_adjusted)
+        """
+        import math
+        ds = self.data_sources.get(self.current_data_source, {})
+        
+        # Determine pixel size in degrees
+        if ds.get("native_resolution_only"):
+            # Use native pixel size
+            pixel_size_degrees = ds.get("native_pixel_size_degrees", 0.004166666666666667)
+        else:
+            # Convert cell size from meters to degrees (approximate)
+            ct = self.cell_size_combo.currentText() if hasattr(self, 'cell_size_combo') else ""
+            if ct:
+                try:
+                    cell_size_m = float(ct)
+                    # Approximate conversion: 1 degree ≈ 111320 meters at equator
+                    pixel_size_degrees = cell_size_m / 111320.0
+                except ValueError:
+                    pixel_size_degrees = 0.004166666666666667  # Default
+            else:
+                pixel_size_degrees = 0.004166666666666667  # Default
+        
+        # Snap west/east to pixel boundaries (round down for west, round up for east)
+        snapped_west = math.floor(west / pixel_size_degrees) * pixel_size_degrees
+        snapped_east = math.ceil(east / pixel_size_degrees) * pixel_size_degrees
+        
+        # Snap south/north to pixel boundaries (round down for south, round up for north)
+        snapped_south = math.floor(south / pixel_size_degrees) * pixel_size_degrees
+        snapped_north = math.ceil(north / pixel_size_degrees) * pixel_size_degrees
+        
+        # Check if any adjustment was made
+        was_adjusted = (
+            abs(snapped_west - west) > 1e-10 or
+            abs(snapped_south - south) > 1e-10 or
+            abs(snapped_east - east) > 1e-10 or
+            abs(snapped_north - north) > 1e-10
+        )
+        
+        return snapped_west, snapped_south, snapped_east, snapped_north, was_adjusted
+    
     def on_selection_completed(self, xmin, ymin, xmax, ymax):
         """Handle selection completion (when mouse is released) - zoom to selection."""
         if xmin != 0 or ymin != 0 or xmax != 0 or ymax != 0:
+            # Snap bounds to cell size grid
+            snapped_west, snapped_south, snapped_east, snapped_north, was_adjusted = self._snap_bounds_to_cell_size(xmin, ymin, xmax, ymax)
+            
+            if was_adjusted:
+                self.log_message(
+                    f"Selection bounds adjusted to align with cell size grid: "
+                    f"({xmin:.6f}, {ymin:.6f}, {xmax:.6f}, {ymax:.6f}) → "
+                    f"({snapped_west:.6f}, {snapped_south:.6f}, {snapped_east:.6f}, {snapped_north:.6f})"
+                )
+            
             # Store the selected bbox for download
-            self.selected_bbox = (xmin, ymin, xmax, ymax)
+            self.selected_bbox = (snapped_west, snapped_south, snapped_east, snapped_north)
             # Temporarily disconnect the selection changed signal to prevent clearing
             self.map_widget.selectionChanged.disconnect()
-            self.zoom_to_selection(xmin, ymin, xmax, ymax)
+            self.zoom_to_selection(snapped_west, snapped_south, snapped_east, snapped_north)
             # Reconnect the signal
             self.map_widget.selectionChanged.connect(self.on_selection_changed)
             # Set the final bounds in the text fields after zoom (both coordinate systems)
-            self.update_coordinate_display(xmin, ymin, xmax, ymax)
+            self.update_coordinate_display(snapped_west, snapped_south, snapped_east, snapped_north)
             # Button state will be updated by update_coordinate_display (which calls check_and_update_download_button)
             
     def zoom_to_selection(self, xmin, ymin, xmax, ymax):
@@ -1091,7 +1216,7 @@ class MainWindow(QMainWindow):
             # Store the selected bbox in world coordinates for drawing (original selection, no modifications)
             # This is what will be shown in the yellow/green box and used for download
             self.map_widget.selected_bbox_world = (xmin, ymin, xmax, ymax)
-            # Ensure service_extent is preserved for color distinction (yellow for dataset bounds, green for user selection)
+            # Ensure service_extent is preserved
             if not hasattr(self.map_widget, 'service_extent') or self.map_widget.service_extent is None:
                 self.map_widget.service_extent = self.service_extent
             # Don't clear selection - keep it visible
@@ -1118,7 +1243,7 @@ class MainWindow(QMainWindow):
         if not bbox:
             QMessageBox.warning(self, "No Selection", "Please select an area on the map.")
             return
-        output_crs = self.crs_combo.currentText()
+        output_crs = "EPSG:4326"
         ds = self.data_sources.get(self.current_data_source, {})
         native_only = ds.get("native_resolution_only", False)
         if native_only:
@@ -1132,8 +1257,8 @@ class MainWindow(QMainWindow):
         else:
             xmin, ymin, xmax, ymax = bbox
             try:
-                cell_size = float(self.cell_size_combo.currentText())
-            except ValueError:
+                cell_size = float(self.cell_size_combo.currentText()) if hasattr(self, 'cell_size_combo') and self.cell_size_combo.count() else 4.0
+            except (ValueError, AttributeError):
                 cell_size = 4.0
             width_meters = xmax - xmin
             height_meters = ymax - ymin
@@ -1163,25 +1288,99 @@ class MainWindow(QMainWindow):
         
         current_time = datetime.now()
         date_time_str = current_time.strftime("%Y-%m-%d_%H-%M-%S")
-        default_filename = f"GEBCO_2025_{cell_size_for_filename}_{date_time_str}.tif" if native_only else f"GEBCO_Bathy_{cell_size_for_filename}m_{date_time_str}.tif"
         
-        # Check if output directory has been selected
-        if self.output_directory and os.path.isdir(self.output_directory):
-            # Use the selected output directory without prompting
-            output_path = os.path.join(self.output_directory, default_filename)
-        else:
-            # No output directory selected - prompt for save location
-            default_path = default_filename
-            output_path, _ = QFileDialog.getSaveFileName(
-                self,
-                "Save GeoTIFF",
-                default_path,
-                "GeoTIFF Files (*.tif *.tiff);;All Files (*)"
-            )
-            
-            # If user cancelled the dialog, abort download
-            if not output_path:
+        # Build list of requested outputs for GEBCO 2025 (any combination of the three)
+        output_requests = []  # list of (mode, path)
+        tid_url = None
+        if native_only and self.current_data_source == "GEBCO 2025" and hasattr(self, 'check_combined'):
+            if self.check_combined.isChecked():
+                output_requests.append(("combined", None))  # path filled below
+            if self.check_bathymetry_only.isChecked():
+                output_requests.append(("bathymetry_only", None))
+            if self.check_land_only.isChecked():
+                output_requests.append(("land_only", None))
+            if self.check_direct_measurements_only.isChecked():
+                output_requests.append(("direct_measurements_only", None))
+            if self.check_direct_unknown_measurements_only.isChecked():
+                output_requests.append(("direct_unknown_measurements_only", None))
+            if output_requests:
+                tid_url = self.data_sources.get("GEBCO 2025 TID", {}).get("url")
+            if self.current_data_source == "GEBCO 2025" and not output_requests:
+                QMessageBox.warning(self, "No Output Selected", "Select at least one output: Combined Bathymetry && Land, Bathymetry Only, Land Only, Direct Measurements Only, or Direct && Unknown Measurement Only.")
                 return
+        
+        # Resolve output path(s) for GEBCO 2025 (multiple outputs possible)
+        if native_only and "TID" not in self.current_data_source and output_requests:
+            if len(output_requests) > 1:
+                if not self.output_directory or not os.path.isdir(self.output_directory):
+                    QMessageBox.warning(self, "Output Directory Required", "Select an output directory when saving multiple grids.")
+                    return
+                out_dir = self.output_directory
+                resolved = []
+                for mode, _ in output_requests:
+                    # Use shorter names for certain modes
+                    if mode == "bathymetry_only":
+                        mode_name = "bathymetry"
+                    elif mode == "land_only":
+                        mode_name = "land"
+                    elif mode == "direct_measurements_only":
+                        mode_name = "direct"
+                    elif mode == "direct_unknown_measurements_only":
+                        mode_name = "direct_unknown"
+                    else:
+                        mode_name = mode
+                    fn = f"GEBCO_2025_{mode_name}_{date_time_str}.tif"
+                    resolved.append((mode, os.path.join(out_dir, fn)))
+                output_requests = resolved
+            else:
+                # Single output
+                mode = output_requests[0][0]
+                # Use shorter names for certain modes
+                if mode == "bathymetry_only":
+                    mode_name = "bathymetry"
+                elif mode == "land_only":
+                    mode_name = "land"
+                elif mode == "direct_measurements_only":
+                    mode_name = "direct"
+                elif mode == "direct_unknown_measurements_only":
+                    mode_name = "direct_unknown"
+                else:
+                    mode_name = mode
+                default_name = f"GEBCO_2025_{mode_name}_{date_time_str}.tif"
+                if self.output_directory and os.path.isdir(self.output_directory):
+                    output_path = os.path.join(self.output_directory, default_name)
+                else:
+                    output_path, _ = QFileDialog.getSaveFileName(self, "Save GeoTIFF", default_name, "GeoTIFF Files (*.tif *.tiff);;All Files (*)")
+                    if not output_path:
+                        return
+                output_requests = [(mode, output_path)]
+        elif native_only and "TID" in self.current_data_source:
+            default_filename = f"GEBCO_2025_TID_{date_time_str}.tif"
+            if self.output_directory and os.path.isdir(self.output_directory):
+                output_path = os.path.join(self.output_directory, default_filename)
+            else:
+                output_path, _ = QFileDialog.getSaveFileName(self, "Save GeoTIFF", default_filename, "GeoTIFF Files (*.tif *.tiff);;All Files (*)")
+                if not output_path:
+                    return
+            output_requests = [("combined", output_path)]  # TID is single "combined" style
+        elif native_only:
+            default_filename = f"GEBCO_2025_{date_time_str}.tif"
+            if self.output_directory and os.path.isdir(self.output_directory):
+                output_path = os.path.join(self.output_directory, default_filename)
+            else:
+                output_path, _ = QFileDialog.getSaveFileName(self, "Save GeoTIFF", default_filename, "GeoTIFF Files (*.tif *.tiff);;All Files (*)")
+                if not output_path:
+                    return
+            output_requests = [("combined", output_path)]
+        else:
+            default_filename = f"GEBCO_Bathy_{cell_size_for_filename}m_{date_time_str}.tif"
+            if self.output_directory and os.path.isdir(self.output_directory):
+                output_path = os.path.join(self.output_directory, default_filename)
+            else:
+                output_path, _ = QFileDialog.getSaveFileName(self, "Save GeoTIFF", default_filename, "GeoTIFF Files (*.tif *.tiff);;All Files (*)")
+                if not output_path:
+                    return
+            output_requests = [("combined", output_path)]
         
         # Disable download button
         self.download_btn.setEnabled(False)
@@ -1196,13 +1395,15 @@ class MainWindow(QMainWindow):
             self.downloader = BathymetryDownloader(
                 self.base_url,
                 bbox_4326,
-                output_path,
+                None,  # output_path unused when output_requests provided
                 output_crs,
                 pixel_size=None,
                 max_size=max_size,
                 use_tile_download=use_tile_download,
                 bbox_in_4326=True,
-                pixel_size_degrees=pixel_size_degrees
+                pixel_size_degrees=pixel_size_degrees,
+                tid_url=tid_url,
+                output_requests=output_requests
             )
         else:
             self.downloader = BathymetryDownloader(
@@ -1226,15 +1427,19 @@ class MainWindow(QMainWindow):
         self.log_message(message)
         
     def on_download_finished(self, file_path):
-        """Handle download completion."""
-        self.status_label.setText(f"Download complete: {file_path}")
-        self.log_message(f"✓ Download complete: {file_path}")
+        """Handle download completion. file_path may be newline-separated for multiple files."""
+        paths = [p.strip() for p in file_path.splitlines() if p.strip()]
+        if not paths:
+            paths = [file_path]
+        display = "\n".join(paths)
+        self.status_label.setText(f"Download complete: {paths[0]}" if len(paths) == 1 else f"Download complete: {len(paths)} files")
+        self.log_message(f"✓ Download complete: {display}")
         self.download_btn.setEnabled(True)
         # Remove bold formatting after download completes
         font = self.download_btn.font()
         font.setBold(False)
         self.download_btn.setFont(font)
-        QMessageBox.information(self, "Success", f"GeoTIFF saved to:\n{file_path}")
+        QMessageBox.information(self, "Success", f"GeoTIFF(s) saved to:\n{display}")
         
     def on_download_error(self, error_message):
         """Handle download error."""
@@ -1262,9 +1467,10 @@ class MainWindow(QMainWindow):
             msg.exec()
         QMessageBox.critical(self, "Download Error", error_message)
         
-    def log_message(self, message):
-        """Add message to log."""
-        # QTextEdit automatically handles both plain text and HTML
+    def log_message(self, message, bold=False):
+        """Add message to log. If bold is True, the message is shown in bold (HTML)."""
+        if bold:
+            message = f"<b>{message}</b>"
         self.log_text.append(message)
         # Auto-scroll to bottom
         scrollbar = self.log_text.verticalScrollBar()
@@ -1431,7 +1637,7 @@ class MainWindow(QMainWindow):
             "",
             "To download the selected area:",
             "  1. Select an area on the map (or enter coordinates)",
-            "  2. Choose your output options (Cell Size, CRS)",
+            "  2. For GEBCO 2025, choose Combined Bathymetry && Land, Bathymetry Only, Land Only, Direct Measurements Only, or Direct && Unknown Measurement Only if needed",
             "  3. Click 'Download Selected Area' button",
             "  4. Choose a filename and location (defaults to selected directory)",
             "",
@@ -1492,16 +1698,53 @@ class MainWindow(QMainWindow):
             self.map_widget.raster_function = new_raster_function
             self.map_widget.hillshade_raster_function = new_hillshade_raster_function
             self.map_widget.base_url = self.base_url
-            # Update service extent in map widget so it can distinguish dataset bounds from user selection
+            # Update service extent in map widget
             self.map_widget.service_extent = self.service_extent
             # Don't update pixel sizes here - they will be updated in on_service_info_loaded after the new service loads
             # This ensures we get the correct pixel sizes for the new data source
+        
+        # Show/hide download mode options (Combined/Bathymetry Only/Land Only) for GEBCO 2025 only
+        self._update_download_mode_visibility()
+        
+        # Update attribution text
+        self._update_attribution()
         
         # Reload service info (this will update extent and reload map)
         self.load_service_info()
         
         # Store selection to restore after map loads (will zoom to it if it overlaps)
         self._pending_selection = saved_selection
+    
+    def _update_download_mode_visibility(self):
+        """Show Output Data Types groupbox only when GEBCO 2025 (not TID) is selected."""
+        if hasattr(self, 'output_data_types_group'):
+            is_gebco_2025_not_tid = (
+                self.current_data_source == "GEBCO 2025"
+            )
+            self.output_data_types_group.setVisible(is_gebco_2025_not_tid)
+    
+    def _update_attribution(self):
+        """Update the attribution text based on the current data source."""
+        if not hasattr(self, 'attribution_label'):
+            return
+        
+        ds = self.data_sources.get(self.current_data_source, {})
+        attribution_text = ds.get("attribution", "")
+        attribution_url = ds.get("attribution_url", "")
+        
+        if attribution_text:
+            self.attribution_label.setText(attribution_text)
+            self.attribution_label.setToolTip(f"Click to open: {attribution_url}")
+            self._current_attribution_url = attribution_url
+            self.attribution_label.setVisible(True)
+        else:
+            self.attribution_label.setVisible(False)
+            self._current_attribution_url = None
+    
+    def _open_attribution_url(self):
+        """Open the attribution URL in the default web browser."""
+        if hasattr(self, '_current_attribution_url') and self._current_attribution_url:
+            QDesktopServices.openUrl(QUrl(self._current_attribution_url))
     
     def _reload_map_with_selection(self):
         """Reload map and restore selection if it exists."""
