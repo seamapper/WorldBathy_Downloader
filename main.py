@@ -253,6 +253,7 @@ class MainWindow(QMainWindow):
         self.attribution_label.setContentsMargins(0, 0, 0, 0)  # Remove any label margins
         self.attribution_label.clicked.connect(self._open_attribution_url)
         self._current_attribution_url = None  # Store current attribution URL
+        self._legend_was_on_before_aoi_off = False  # Restore Legend when AoI is re-enabled
         attribution_layout.addWidget(self.attribution_label)
         attribution_group.setLayout(attribution_layout)
         left_container_layout.addWidget(attribution_group)
@@ -419,8 +420,8 @@ class MainWindow(QMainWindow):
         progress_group.setLayout(progress_layout)
         right_layout.addWidget(progress_group)
         
-        # Status log
-        log_group = QGroupBox("Status Log")
+        # Activity log
+        log_group = QGroupBox("Activity Log")
         log_layout = QVBoxLayout()
         
         self.log_text = QTextEdit()
@@ -835,11 +836,20 @@ class MainWindow(QMainWindow):
     
     def on_aoi_toggled(self, state):
         """Handle AOI checkbox toggle."""
+        show_aoi = (state == Qt.CheckState.Checked.value or state == 2)
         if self.map_widget:
-            show_aoi = (state == Qt.CheckState.Checked.value or state == 2)
             self.map_widget.show_aoi = show_aoi
             # Just update display (no need to reload map)
             self.map_widget.update()
+        if not show_aoi:
+            # When AoI is unchecked, remember Legend state and uncheck Legend
+            self._legend_was_on_before_aoi_off = self.legend_checkbox.isChecked()
+            if self._legend_was_on_before_aoi_off:
+                self.legend_checkbox.setChecked(False)
+        else:
+            # When AoI is re-enabled, restore Legend if it was on before
+            if self._legend_was_on_before_aoi_off:
+                self.legend_checkbox.setChecked(True)
                 
     def check_and_update_download_button(self):
         """Check if selection is valid and within size limits, update download button state."""
@@ -1488,10 +1498,12 @@ class MainWindow(QMainWindow):
             msg.exec()
         QMessageBox.critical(self, "Download Error", error_message)
         
-    def log_message(self, message, bold=False):
-        """Add message to log. If bold is True, the message is shown in bold (HTML)."""
+    def log_message(self, message, bold=False, color=None):
+        """Add message to log. If bold is True, the message is shown in bold (HTML). If color is set, wrap in span (e.g. 'orange')."""
         if bold:
             message = f"<b>{message}</b>"
+        if color:
+            message = f'<span style="color: {color};">{message}</span>'
         self.log_text.append(message)
         # Auto-scroll to bottom
         scrollbar = self.log_text.verticalScrollBar()
@@ -1629,6 +1641,11 @@ class MainWindow(QMainWindow):
                 # This mimics what happens when the user hits return in a coordinate field
                 QTimer.singleShot(300, lambda: self.zoom_to_selection(*self.service_extent))
                 self.log_message("Default selection set to service extent bounds, will zoom to dataset bounds")
+        # Show map interaction instructions once when map first loads (in orange)
+        self.log_message(
+            "Map tips — Pan: middle mouse button + drag. Zoom: mouse wheel. Select Area of Interest: left mouse button + drag.",
+            color="orange"
+        )
     
     def _zoom_to_service_extent(self):
         """Zoom to service extent bounds - helper method for delayed zoom."""

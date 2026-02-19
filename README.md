@@ -86,14 +86,14 @@ The application interface is organized into several panels:
     - **Pixel count display**: Shows number of pixels in selected area
   - **Output Directory**: Button and display for selecting save location
   - **Download button**: Initiates the download process
-  - **Status Log**: Real-time feedback and operation logging
+  - **Activity Log**: Real-time feedback and operation logging
 
 ### Additional Features
 
 - **Bounds snapping**: Selected area automatically snaps to cell-size grid
 - **Tile download support**: Handles large datasets by downloading in tiles
-- **Progress tracking**: Real-time progress bar and status log
-- **Status log**: Detailed logging of operations with bold highlighting for TID extraction messages
+- **Progress tracking**: Real-time progress bar and activity log
+- **Activity log**: Detailed logging of operations with bold highlighting for TID extraction messages
 - **Data attribution**: Clickable DOI link in the Data Set Attribution groupbox opens the dataset citation page
 - **Output directory selection**: Choose where to save downloaded files
 - **Coordinate validation**: Ensures valid geographic bounds
@@ -234,9 +234,9 @@ For detailed Mac build instructions, troubleshooting, and distribution guideline
 2. Click Download
 3. A single GeoTIFF file is generated
 
-### Status Log
+### Activity Log
 
-The Status Log provides real-time feedback on operations:
+The Activity Log provides real-time feedback on operations:
 - **Bold messages** appear when TID-based extraction options are selected
 - Progress updates during download
 - Error messages if issues occur
