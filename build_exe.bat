@@ -46,7 +46,7 @@ if exist dist rmdir /s /q dist
 
 REM Build the executable using the spec file
 echo Running PyInstaller...
-"%VENV_PYTHON%" -m PyInstaller GEBCO_Downloader.spec
+"%VENV_PYTHON%" -m PyInstaller WorldBathy_Downloader.spec
 
 if errorlevel 1 (
     echo(

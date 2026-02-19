@@ -37,7 +37,7 @@ The easiest way to build the Mac app is to use the provided build script:
 The script will:
 - Check if PyInstaller is installed (install it if needed)
 - Clean previous builds
-- Build the application using the `GEBCO_Downloader.spec` configuration file
+- Build the application using the `WorldBathy_Downloader.spec` configuration file
 - Create a `.app` bundle in the `dist` folder
 
 ## Manual Build Process
@@ -86,11 +86,11 @@ rm -rf build dist
 Run PyInstaller with the spec file:
 
 ```bash
-pyinstaller GEBCO_Downloader.spec --clean --noconfirm
+pyinstaller WorldBathy_Downloader.spec --clean --noconfirm
 ```
 
 **Parameters explained:**
-- `GEBCO_Downloader.spec`: The configuration file that defines how to build the app
+- `WorldBathy_Downloader.spec`: The configuration file that defines how to build the app
 - `--clean`: Remove temporary files and cache before building
 - `--noconfirm`: Overwrite output directory without asking
 
@@ -99,10 +99,10 @@ pyinstaller GEBCO_Downloader.spec --clean --noconfirm
 After a successful build, the Mac app bundle will be in the `dist` folder:
 
 ```
-dist/GEBCO_Downloader_V<version>.app
+dist/WorldBathy_V<version>.app
 ```
 
-For example: `dist/GEBCO_Downloader_V2026.2.app`
+For example: `dist/WorldBathy_V2026.2.app`
 
 The version number is automatically extracted from the `__version__` variable in `main.py`.
 
@@ -111,11 +111,11 @@ The version number is automatically extracted from the `__version__` variable in
 A macOS `.app` bundle is actually a directory with a specific structure:
 
 ```
-GEBCO_Downloader_V2026.2.app/
+WorldBathy_V2026.2.app/
 ├── Contents/
 │   ├── Info.plist          # App metadata
 │   ├── MacOS/              # Executable binary
-│   │   └── GEBCO_Downloader_V2026.2
+│   │   └── WorldBathy_V2026.2
 │   ├── Resources/          # Resources (icons, data files)
 │   │   └── CCOM.icns      # App icon (if converted)
 │   └── Frameworks/         # Bundled frameworks
@@ -123,7 +123,7 @@ GEBCO_Downloader_V2026.2.app/
 
 You can explore the bundle:
 ```bash
-open dist/GEBCO_Downloader_V2026.2.app/Contents
+open dist/WorldBathy_V2026.2.app/Contents
 ```
 
 ## Mac-Specific Considerations
@@ -173,12 +173,12 @@ For distribution outside the App Store, code signing helps users trust your app:
 
 2. **Sign the app**:
    ```bash
-   codesign --deep --force --verify --verbose --sign "Developer ID Application: Your Name" dist/GEBCO_Downloader_V2026.2.app
+   codesign --deep --force --verify --verbose --sign "Developer ID Application: Your Name" dist/WorldBathy_V2026.2.app
    ```
 
 3. **Verify signing**:
    ```bash
-   codesign --verify --verbose dist/GEBCO_Downloader_V2026.2.app
+   codesign --verify --verbose dist/WorldBathy_V2026.2.app
    ```
 
 ### Notarization (For Distribution)
@@ -187,7 +187,7 @@ If distributing outside the App Store, notarization is required for macOS 10.15+
 
 1. **Create a zip file**:
    ```bash
-   ditto -c -k --keepParent dist/GEBCO_Downloader_V2026.2.app GEBCO_Downloader_V2026.2.zip
+   ditto -c -k --keepParent dist/WorldBathy_V2026.2.app WorldBathy_V2026.2.zip
    ```
 
 2. **Submit for notarization**:
@@ -196,7 +196,7 @@ If distributing outside the App Store, notarization is required for macOS 10.15+
      --primary-bundle-id "edu.unh.ccom.gebco-downloader" \
      --username "your-apple-id@example.com" \
      --password "@keychain:AC_PASSWORD" \
-     --file GEBCO_Downloader_V2026.2.zip
+     --file WorldBathy_V2026.2.zip
    ```
 
 3. **Check notarization status**:
@@ -208,7 +208,7 @@ If distributing outside the App Store, notarization is required for macOS 10.15+
 
 4. **Staple the notarization ticket**:
    ```bash
-   xcrun stapler staple dist/GEBCO_Downloader_V2026.2.app
+   xcrun stapler staple dist/WorldBathy_V2026.2.app
    ```
 
 **Note**: Notarization requires an Apple Developer account and can take 10-30 minutes.
@@ -230,7 +230,7 @@ After this, you can double-click normally.
 If you built the app yourself, you can remove the quarantine attribute:
 
 ```bash
-xattr -cr dist/GEBCO_Downloader_V2026.2.app
+xattr -cr dist/WorldBathy_V2026.2.app
 ```
 
 ## Troubleshooting
@@ -249,7 +249,7 @@ xattr -cr dist/GEBCO_Downloader_V2026.2.app
 **Problem**: PyInstaller didn't bundle all rasterio submodules.
 
 **Solution**: 
-- The `GEBCO_Downloader.spec` file should already include these as hidden imports
+- The `WorldBathy_Downloader.spec` file should already include these as hidden imports
 - If a new rasterio module is missing, add it to the `hiddenimports` list in the spec file
 - Rebuild the app
 
@@ -259,7 +259,7 @@ xattr -cr dist/GEBCO_Downloader_V2026.2.app
 
 **Solution**:
 - Right-click → "Open" → "Open" (first time only)
-- Or remove quarantine: `xattr -cr dist/GEBCO_Downloader_V2026.2.app`
+- Or remove quarantine: `xattr -cr dist/WorldBathy_V2026.2.app`
 - Or code sign the app (see Code Signing section above)
 
 ### App Crashes on Launch
@@ -270,7 +270,7 @@ xattr -cr dist/GEBCO_Downloader_V2026.2.app
 1. **Check Console.app**: Open Console.app and look for crash logs
 2. **Run from Terminal**: Launch from Terminal to see error messages:
    ```bash
-   dist/GEBCO_Downloader_V2026.2.app/Contents/MacOS/GEBCO_Downloader_V2026.2
+   dist/WorldBathy_V2026.2.app/Contents/MacOS/WorldBathy_V2026.2
    ```
 3. **Build with console enabled**: Edit the spec file temporarily:
    - Change `console=False` to `console=True`
@@ -314,7 +314,7 @@ To create a disk image (.dmg) for easy distribution:
 1. **Create a temporary directory structure**:
    ```bash
    mkdir -p dmg_build
-   cp -R dist/GEBCO_Downloader_V2026.2.app dmg_build/
+   cp -R dist/WorldBathy_V2026.2.app dmg_build/
    ```
 
 2. **Create a symbolic link to Applications**:
@@ -327,7 +327,7 @@ To create a disk image (.dmg) for easy distribution:
    hdiutil create -volname "GEBCO Downloader" \
      -srcfolder dmg_build \
      -ov -format UDZO \
-     GEBCO_Downloader_V2026.2.dmg
+     WorldBathy_V2026.2.dmg
    ```
 
 4. **Clean up**:
@@ -342,10 +342,10 @@ After building, you'll see:
 ```
 GEBCO_Downloader/
 ├── build/              # Temporary build files (can be deleted)
-│   └── GEBCO_Downloader_V2026.2/
+│   └── WorldBathy_V2026.2/
 ├── dist/               # Final app bundle location
-│   └── GEBCO_Downloader_V2026.2.app
-├── GEBCO_Downloader.spec  # PyInstaller configuration
+│   └── WorldBathy_V2026.2.app
+├── WorldBathy_Downloader.spec  # PyInstaller configuration
 └── build_exe.sh        # Build script
 ```
 
@@ -384,7 +384,7 @@ The spec file works cross-platform, but you may want Mac-specific tweaks:
    ```python
    app = BUNDLE(
        exe,
-       name='GEBCO_Downloader_V2026.2',
+       name='WorldBathy_V2026.2',
        icon='media/CCOM.icns',
        bundle_identifier='edu.unh.ccom.gebco-downloader',
        info_plist={
@@ -403,7 +403,7 @@ The spec file works cross-platform, but you may want Mac-specific tweaks:
 
 To build with debugging enabled:
 
-1. Edit `GEBCO_Downloader.spec`
+1. Edit `WorldBathy_Downloader.spec`
 2. Change `console=False` to `console=True`
 3. Change `debug=False` to `debug=True`
 4. Rebuild
@@ -418,12 +418,12 @@ To build a universal binary that works on both Apple Silicon and Intel Macs:
 2. **Or build separately** and create a fat binary:
    ```bash
    # Build for Apple Silicon
-   arch -arm64 pyinstaller GEBCO_Downloader.spec
-   mv dist/GEBCO_Downloader_V2026.2.app dist/GEBCO_Downloader_V2026.2_arm64.app
+   arch -arm64 pyinstaller WorldBathy_Downloader.spec
+   mv dist/WorldBathy_V2026.2.app dist/WorldBathy_V2026.2_arm64.app
    
    # Build for Intel
-   arch -x86_64 pyinstaller GEBCO_Downloader.spec
-   mv dist/GEBCO_Downloader_V2026.2.app dist/GEBCO_Downloader_V2026.2_x86_64.app
+   arch -x86_64 pyinstaller WorldBathy_Downloader.spec
+   mv dist/WorldBathy_V2026.2.app dist/WorldBathy_V2026.2_x86_64.app
    
    # Create universal binary (requires lipo)
    # This is complex and may require manual framework merging
@@ -439,7 +439,7 @@ The app name includes the version number from `main.py`:
 __version__ = "2026.2"
 ```
 
-The spec file automatically extracts this and creates: `GEBCO_Downloader_V2026.2.app`
+The spec file automatically extracts this and creates: `WorldBathy_V2026.2.app`
 
 To update the version:
 1. Edit `__version__` in `main.py`
@@ -458,7 +458,7 @@ To update the version:
 Building the Mac app is straightforward:
 
 1. Use the build script: `./build_exe.sh`
-2. Or manually: `pyinstaller GEBCO_Downloader.spec --clean --noconfirm`
-3. Find the app in `dist/GEBCO_Downloader_V<version>.app`
+2. Or manually: `pyinstaller WorldBathy_Downloader.spec --clean --noconfirm`
+3. Find the app in `dist/WorldBathy_V<version>.app`
 
 The app is self-contained and ready for distribution. For production distribution, consider code signing and notarization.

@@ -21,7 +21,7 @@ rm -rf build dist
 
 # Build the executable using the spec file
 echo "Running PyInstaller..."
-pyinstaller GEBCO_Downloader.spec
+pyinstaller WorldBathy_Downloader.spec
 
 if [ $? -ne 0 ]; then
     echo ""

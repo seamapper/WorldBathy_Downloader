@@ -36,7 +36,7 @@ The script will:
 - Check if PyInstaller is installed (install it if needed)
 - Verify PyQt6 is available
 - Clean previous builds
-- Build the executable using the `GEBCO_Downloader.spec` configuration file
+- Build the executable using the `WorldBathy_Downloader.spec` configuration file
 - Create the executable in the `dist` folder
 
 ## Manual Build Process
@@ -91,11 +91,11 @@ rmdir /s /q dist
 Run PyInstaller with the spec file:
 
 ```bash
-C:\Users\pjohnson\PycharmProjects\.venv\Scripts\python.exe -m PyInstaller GEBCO_Downloader.spec --clean --noconfirm
+C:\Users\pjohnson\PycharmProjects\.venv\Scripts\python.exe -m PyInstaller WorldBathy_Downloader.spec --clean --noconfirm
 ```
 
 **Parameters explained:**
-- `GEBCO_Downloader.spec`: The configuration file that defines how to build the executable
+- `WorldBathy_Downloader.spec`: The configuration file that defines how to build the executable
 - `--clean`: Remove temporary files and cache before building
 - `--noconfirm`: Overwrite output directory without asking
 
@@ -104,16 +104,16 @@ C:\Users\pjohnson\PycharmProjects\.venv\Scripts\python.exe -m PyInstaller GEBCO_
 After a successful build, the executable will be in the `dist` folder:
 
 ```
-dist\GEBCO_Downloader_V<version>.exe
+dist\WorldBathy_V<version>.exe
 ```
 
-For example: `dist\GEBCO_Downloader_V2026.2.exe`
+For example: `dist\WorldBathy_V2026.2.exe`
 
 The version number is automatically extracted from the `__version__` variable in `main.py`.
 
 ## Understanding the Spec File
 
-The `GEBCO_Downloader.spec` file contains the PyInstaller configuration:
+The `WorldBathy_Downloader.spec` file contains the PyInstaller configuration:
 
 ### Key Components
 
@@ -148,7 +148,7 @@ Some Python packages (like rasterio) use dynamic imports that PyInstaller cannot
 **Problem**: PyInstaller didn't bundle all rasterio submodules.
 
 **Solution**: 
-- The `GEBCO_Downloader.spec` file should already include these as hidden imports
+- The `WorldBathy_Downloader.spec` file should already include these as hidden imports
 - If a new rasterio module is missing, add it to the `hiddenimports` list in the spec file
 - Rebuild the executable
 
@@ -158,7 +158,7 @@ Some Python packages (like rasterio) use dynamic imports that PyInstaller cannot
 
 **Solution**:
 - Build with console enabled temporarily to see error messages:
-  - Edit `GEBCO_Downloader.spec` and change `console=False` to `console=True`
+  - Edit `WorldBathy_Downloader.spec` and change `console=False` to `console=True`
   - Rebuild and run to see the error output
 - Check that all DLLs are bundled (especially PyQt6 and rasterio dependencies)
 - Verify the icon file exists at `media/CCOM.ico`
@@ -193,8 +193,8 @@ GEBCO_Downloader/
 ├── build/              # Temporary build files (can be deleted)
 │   └── GEBCO_Downloader/
 ├── dist/               # Final executable location
-│   └── GEBCO_Downloader_V2026.2.exe
-├── GEBCO_Downloader.spec  # PyInstaller configuration
+│   └── WorldBathy_V2026.2.exe
+├── WorldBathy_Downloader.spec  # PyInstaller configuration
 └── build_exe.bat       # Build script
 ```
 
@@ -226,7 +226,7 @@ If you need to customize the build:
 
 To build with debugging enabled:
 
-1. Edit `GEBCO_Downloader.spec`
+1. Edit `WorldBathy_Downloader.spec`
 2. Change `console=False` to `console=True`
 3. Change `debug=False` to `debug=True`
 4. Rebuild
@@ -241,7 +241,7 @@ The executable name includes the version number from `main.py`:
 __version__ = "2026.2"
 ```
 
-The spec file automatically extracts this and creates: `GEBCO_Downloader_V2026.2.exe`
+The spec file automatically extracts this and creates: `WorldBathy_V2026.2.exe`
 
 To update the version:
 1. Edit `__version__` in `main.py`
@@ -259,7 +259,7 @@ To update the version:
 Building the executable is straightforward:
 
 1. Use the build script: `build_exe.bat`
-2. Or manually: `python -m PyInstaller GEBCO_Downloader.spec --clean --noconfirm`
-3. Find the executable in `dist\GEBCO_Downloader_V<version>.exe`
+2. Or manually: `python -m PyInstaller WorldBathy_Downloader.spec --clean --noconfirm`
+3. Find the executable in `dist\WorldBathy_V<version>.exe`
 
 The executable is self-contained and ready for distribution!

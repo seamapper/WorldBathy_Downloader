@@ -2,7 +2,7 @@
 
 A PyQt6-based desktop application for downloading bathymetry data from ArcGIS ImageServer REST endpoints and creating GeoTIFF files with interactive area selection.
 
-![GEBCO Downloader](media/GEBCO_Downloader.jpg)
+![WorldBathy Downloader](media/WorldBathy_Downloader.jpg)
 
 ## Overview
 
@@ -101,6 +101,7 @@ The application interface is organized into several panels:
 - **AoI display**: Toggle Area of Interest (selection rectangle) visibility (enabled by default). When AoI is unchecked, Legend is also unchecked; when AoI is re-enabled, Legend is restored if it was on before
 - **Save Map to PNG**: Export the current map display to a PNG file (user chooses location and filename)
 - **Startup map tips**: When the map first loads, the Activity Log shows a short tip in orange explaining how to Pan, Zoom, and Select an Area of Interest
+- **Configuration**: The application saves settings (e.g. output directory) to `worldbathy_downloader_config.json` in the application directory
 
 ## Installation
 
@@ -146,10 +147,10 @@ To create a standalone Windows executable (.exe) file:
    
    Or manually run PyInstaller:
    ```bash
-   C:\Users\pjohnson\PycharmProjects\.venv\Scripts\python.exe -m PyInstaller GEBCO_Downloader.spec --clean --noconfirm
+   C:\Users\pjohnson\PycharmProjects\.venv\Scripts\python.exe -m PyInstaller WorldBathy_Downloader.spec --clean --noconfirm
    ```
 
-4. **Find the executable**: The built executable will be located in the `dist` folder with a versioned name (e.g., `GEBCO_Downloader_V2026.2.exe`)
+4. **Find the executable**: The built executable will be located in the `dist` folder as **WorldBathy_V** followed by the version from `main.py` (e.g., `WorldBathy_V2026.2.exe`)
 
 The executable includes:
 - All required dependencies bundled (PyQt6, rasterio, numpy, pyproj, etc.)
@@ -158,7 +159,7 @@ The executable includes:
 - Single-file distribution (all dependencies included)
 - Version number automatically extracted from `main.py` and included in the filename
 
-**Note**: The first build may take several minutes as PyInstaller analyzes and bundles all dependencies. Subsequent builds are faster. The build script uses the `GEBCO_Downloader.spec` file which includes necessary hidden imports for rasterio submodules.
+**Note**: The first build may take several minutes as PyInstaller analyzes and bundles all dependencies. Subsequent builds are faster. The build script uses the `WorldBathy_Downloader.spec` file; the output executable is named **WorldBathy_V** + version (e.g. `WorldBathy_V2026.2.exe`) and includes necessary hidden imports for rasterio submodules.
 
 ### Building a Mac App
 
@@ -184,10 +185,10 @@ To create a macOS application (.app bundle):
    
    Or manually run PyInstaller:
    ```bash
-   pyinstaller GEBCO_Downloader.spec --clean --noconfirm
+   pyinstaller WorldBathy_Downloader.spec --clean --noconfirm
    ```
 
-3. **Find the app bundle**: The built app will be located in the `dist` folder with a versioned name (e.g., `GEBCO_Downloader_V2026.2.app`)
+3. **Find the app bundle**: The built app will be located in the `dist` folder with a versioned name (e.g., `WorldBathy_V2026.2.app`)
 
 **Mac-Specific Notes**:
 - The app bundle is a directory that macOS treats as a single application
@@ -347,7 +348,7 @@ University of New Hampshire
 
 ## Version History
 
-- **2026.2** - Enhanced with multiple output types, data attribution, improved UI, and executable build improvements
+- **2026.2** - Enhanced with multiple output types, data attribution, improved UI, WorldBathy naming (executable and config), and executable build improvements
 - **2026.1** - First release
 
 ## Support

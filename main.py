@@ -1,5 +1,5 @@
 """
-GEBCO Bathymetry Downloader
+World Bathymetry Downloader
 ==========================
 
 A PyQt6-based application for downloading GEBCO and other bathymetry data from
@@ -169,7 +169,7 @@ class MainWindow(QMainWindow):
         self.service_loader = None
         self._updating_coordinates = False  # Flag to prevent recursive updates
         self.output_directory = None  # Store selected output directory
-        self.config_file = "gebco_downloader_config.json"  # Config file path
+        self.config_file = "worldbathy_downloader_config.json"  # Config file path
         self._data_source_changing = False  # Flag to track when data source is changing
         
         self.init_ui()
@@ -178,7 +178,7 @@ class MainWindow(QMainWindow):
         
     def init_ui(self):
         """Initialize the user interface."""
-        self.setWindowTitle(f"GEBCO Bathymetry Downloader v{__version__} - pjohnson@ccom.unh.edu")
+        self.setWindowTitle(f"World Bathymetry Downloader v{__version__} - pjohnson@ccom.unh.edu")
         self.setGeometry(100, 100, 1200, 800)
         
         # Central widget
