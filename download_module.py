@@ -1,5 +1,11 @@
 """
 Module for downloading bathymetry data from ArcGIS ImageServer and creating GeoTIFF files.
+
+License: BSD 3-Clause License
+Copyright (c) 2025, Center for Coastal and Ocean Mapping, University of New Hampshire
+All rights reserved.
+
+See LICENSE file for full license text.
 """
 import requests
 import numpy as np

@@ -1,5 +1,11 @@
 """
 Map widget for displaying bathymetry data and selecting areas of interest.
+
+License: BSD 3-Clause License
+Copyright (c) 2025, Center for Coastal and Ocean Mapping, University of New Hampshire
+All rights reserved.
+
+See LICENSE file for full license text.
 """
 from PyQt6.QtWidgets import QWidget, QLabel, QVBoxLayout, QHBoxLayout, QPushButton
 from PyQt6.QtCore import Qt, QRect, QPoint, QThread, pyqtSignal, QSize

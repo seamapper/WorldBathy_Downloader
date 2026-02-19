@@ -26,7 +26,8 @@ All rights reserved.
 See LICENSE file for full license text.
 """
 
-__version__ = "2026.1" # First release of the program
+# __version__ = "2026.1" # First release of the program
+__version__ = "2026.2" # Cleaned up the program and added licensing information
 
 import sys
 import os

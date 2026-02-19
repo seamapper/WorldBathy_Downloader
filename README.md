@@ -67,7 +67,9 @@ The **Output Options** panel contains an **Output Data Types** groupbox (visible
 
 The application interface is organized into several panels:
 
-- **Map Panel**: Interactive map display with selection tools
+- **Left Panel**:
+  - **Map Panel**: Interactive map display with selection tools
+  - **Data Set Attribution**: Groupbox below the map showing dataset citation with clickable DOI link (green text)
 - **Right Panel**: Contains controls and information
   - **Data Source**: Dropdown to select GEBCO 2025 or GEBCO 2025 TID
   - **Selected Area**: Coordinate display and editing (West, South, East, North)
@@ -84,8 +86,10 @@ The application interface is organized into several panels:
 - **Tile download support**: Handles large datasets by downloading in tiles
 - **Progress tracking**: Real-time progress bar and status log
 - **Status log**: Detailed logging of operations with bold highlighting for TID extraction messages
+- **Data attribution**: Clickable DOI link in the Data Set Attribution groupbox opens the dataset citation page
 - **Output directory selection**: Choose where to save downloaded files
 - **Coordinate validation**: Ensures valid geographic bounds
+- **Legend display**: Toggle legend visibility (enabled by default)
 
 ## Installation
 
@@ -190,21 +194,37 @@ The Status Log provides real-time feedback on operations:
 
 ### Map Controls
 
-- **Fit to Extent**: Zoom map to show full dataset extent
+- **Legend**: Toggle legend visibility (checked by default)
+- **Zoom to Full Extent**: Zoom map to show full dataset extent
 - **Clear Selection**: Remove current area selection
 - **Refresh Map**: Reload map display
+
+### Data Attribution
+
+The **Data Set Attribution** groupbox appears below the Map panel and displays:
+- Dataset citation text (e.g., "GEBCO Compilation Group (2025) GEBCO 2025 Grid")
+- Clickable DOI link (green text) that opens the dataset citation page in your web browser
+- Attribution text updates automatically when switching between data sources
 
 ## File Naming Convention
 
 Files are automatically named with the following pattern:
 
-- **GEBCO 2025**: `GEBCO_2025_<mode>_<timestamp>.tif`
-  - Examples:
-    - `GEBCO_2025_combined_2026-02-17_14-30-45.tif`
-    - `GEBCO_2025_bathymetry_only_2026-02-17_14-30-45.tif`
-    - `GEBCO_2025_direct_measurements_only_2026-02-17_14-30-45.tif`
+- **GEBCO 2025**: `GEBCO_2025_<mode_name>_<timestamp>.tif`
+  - Mode name mappings:
+    - `combined` → `GEBCO_2025_combined_2026-02-17_14-30-45.tif`
+    - `bathymetry_only` → `GEBCO_2025_bathymetry_2026-02-17_14-30-45.tif`
+    - `land_only` → `GEBCO_2025_land_2026-02-17_14-30-45.tif`
+    - `direct_measurements_only` → `GEBCO_2025_direct_2026-02-17_14-30-45.tif`
+    - `direct_unknown_measurements_only` → `GEBCO_2025_direct_unknown_2026-02-17_14-30-45.tif`
 
 - **GEBCO 2025 TID**: `GEBCO_2025_TID_<timestamp>.tif`
+  - Example: `GEBCO_2025_TID_2026-02-17_14-30-45.tif`
+
+- **Non-native data sources**: `GEBCO_Bathy_{cell_size}m_{timestamp}.tif`
+  - Example: `GEBCO_Bathy_4m_2026-02-17_14-30-45.tif`
+
+**Timestamp Format**: All filenames include `YYYY-MM-DD_HH-MM-SS` format (e.g., `2026-02-17_14-30-45`)
 
 ## Technical Details
 
