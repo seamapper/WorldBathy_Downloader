@@ -1,8 +1,8 @@
 @echo off
-REM Build script for GEBCO Bathymetry Downloader
+REM Build script for World Bathymetry Downloader
 REM This script creates a Windows executable using PyInstaller
 
-echo Building GEBCO Bathymetry Downloader executable...
+echo Building World Bathymetry Downloader executable...
 echo(
 
 REM Use Python from virtual environment

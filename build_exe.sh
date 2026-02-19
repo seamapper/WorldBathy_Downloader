@@ -1,8 +1,8 @@
 #!/bin/bash
-# Build script for GEBCO Bathymetry Downloader
-# This script creates an executable using PyInstaller (works on Linux/Mac)
+# Build script for World Bathymetry Downloader
+# This script creates an app/executable using PyInstaller (works on Linux/Mac)
 
-echo "Building GEBCO Bathymetry Downloader executable..."
+echo "Building WorldBathy executable..."
 echo ""
 
 # Check if PyInstaller is installed
@@ -16,12 +16,21 @@ if ! python3 -c "import PyInstaller" 2>/dev/null; then
     fi
 fi
 
+# Check if PyQt6 is installed (required for the application)
+if ! python3 -c "import PyQt6" 2>/dev/null; then
+    echo "WARNING: PyQt6 is not installed in this Python environment."
+    echo "The app will not work without PyQt6."
+    echo "Please install it: pip3 install PyQt6"
+    echo ""
+    read -p "Press Enter to continue anyway (build may fail)..."
+fi
+
 # Clean previous builds
 rm -rf build dist
 
-# Build the executable using the spec file
+# Build using the spec file
 echo "Running PyInstaller..."
-pyinstaller WorldBathy_Downloader.spec
+pyinstaller WorldBathy_Downloader.spec --clean --noconfirm
 
 if [ $? -ne 0 ]; then
     echo ""
@@ -31,5 +40,6 @@ fi
 
 echo ""
 echo "Build completed successfully!"
-echo "The executable is located in the 'dist' folder: dist/GEBCO_Downloader"
+echo "The executable name includes the version from main.py (e.g. WorldBathy_V2026.2)."
+echo "Output is in the 'dist' folder (e.g. dist/WorldBathy_V2026.2.app on macOS)."
 echo ""
