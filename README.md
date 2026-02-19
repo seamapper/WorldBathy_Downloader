@@ -76,7 +76,7 @@ The **Output Options** panel contains an **Output Data Types** groupbox (visible
 The application interface is organized into several panels:
 
 - **Left Panel**:
-  - **Map Panel**: Interactive map display with selection tools
+  - **Map Panel**: Interactive map display with selection tools, Legend and AoI checkboxes, and buttons (Zoom to Full Extent, Clear Selection, Refresh Map, Save Map to PNG)
   - **Data Set Attribution**: Groupbox below the map showing dataset citation with clickable DOI link (green text)
 - **Right Panel**: Contains controls and information
   - **Data Source**: Dropdown to select GEBCO 2025 or GEBCO 2025 TID
@@ -98,6 +98,9 @@ The application interface is organized into several panels:
 - **Output directory selection**: Choose where to save downloaded files
 - **Coordinate validation**: Ensures valid geographic bounds
 - **Legend display**: Toggle legend visibility (enabled by default)
+- **AoI display**: Toggle Area of Interest (selection rectangle) visibility (enabled by default). When AoI is unchecked, Legend is also unchecked; when AoI is re-enabled, Legend is restored if it was on before
+- **Save Map to PNG**: Export the current map display to a PNG file (user chooses location and filename)
+- **Startup map tips**: When the map first loads, the Activity Log shows a short tip in orange explaining how to Pan, Zoom, and Select an Area of Interest
 
 ## Installation
 
@@ -237,6 +240,7 @@ For detailed Mac build instructions, troubleshooting, and distribution guideline
 ### Activity Log
 
 The Activity Log provides real-time feedback on operations:
+- **Startup tip** (in orange): When the map first loads, a short message explains how to Pan (middle mouse + drag), Zoom (mouse wheel), and Select an Area of Interest (left mouse + drag)
 - **Bold messages** appear when TID-based extraction options are selected
 - Progress updates during download
 - Error messages if issues occur
@@ -245,9 +249,11 @@ The Activity Log provides real-time feedback on operations:
 ### Map Controls
 
 - **Legend**: Toggle legend visibility (checked by default)
+- **AoI**: Toggle Area of Interest (selection rectangle) visibility (checked by default). Unchecking AoI also unchecks Legend; re-checking AoI restores Legend if it was on before
 - **Zoom to Full Extent**: Zoom map to show full dataset extent
 - **Clear Selection**: Remove current area selection
 - **Refresh Map**: Reload map display
+- **Save Map to PNG**: Save the current map display to a PNG file; a save dialog lets you choose the location and filename
 
 ### Data Attribution
 
