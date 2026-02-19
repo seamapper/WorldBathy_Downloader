@@ -151,6 +151,43 @@ The executable includes:
 
 **Note**: The first build may take several minutes as PyInstaller analyzes and bundles all dependencies. Subsequent builds are faster. The build script uses the `GEBCO_Downloader.spec` file which includes necessary hidden imports for rasterio submodules.
 
+### Building a Mac App
+
+To create a macOS application (.app bundle):
+
+1. **Prerequisites**: You must build on a Mac (macOS 10.13 or later)
+   - Ensure Python 3.8+ is installed
+   - Create and activate a virtual environment (recommended):
+     ```bash
+     python3 -m venv venv
+     source venv/bin/activate
+     ```
+   - Install dependencies:
+     ```bash
+     pip install PyQt6 rasterio numpy requests pyproj Pillow pyinstaller
+     ```
+
+2. **Run the build script**:
+   ```bash
+   chmod +x build_exe.sh
+   ./build_exe.sh
+   ```
+   
+   Or manually run PyInstaller:
+   ```bash
+   pyinstaller GEBCO_Downloader.spec --clean --noconfirm
+   ```
+
+3. **Find the app bundle**: The built app will be located in the `dist` folder with a versioned name (e.g., `GEBCO_Downloader_V2026.2.app`)
+
+**Mac-Specific Notes**:
+- The app bundle is a directory that macOS treats as a single application
+- On first launch, macOS may show a Gatekeeper warning (right-click → "Open" → "Open")
+- For distribution, consider code signing and notarization (see `BUILD_MAC_APP.md` for details)
+- The spec file uses a `.ico` icon file; for better Mac integration, convert to `.icns` format
+
+For detailed Mac build instructions, troubleshooting, and distribution guidelines, see `BUILD_MAC_APP.md`.
+
 ## Usage
 
 ### Selecting an Area
