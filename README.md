@@ -1,4 +1,4 @@
-# GEBCO Bathymetry Downloader
+# World Bathymetry Downloader
 
 A PyQt6-based desktop application for downloading bathymetry data from ArcGIS ImageServer REST endpoints and creating GeoTIFF files with interactive area selection.
 
