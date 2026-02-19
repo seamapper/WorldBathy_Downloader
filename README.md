@@ -6,7 +6,7 @@ A PyQt6-based desktop application for downloading bathymetry data from ArcGIS Im
 
 ## Overview
 
-The GEBCO Bathymetry Downloader provides an intuitive graphical interface for selecting geographic areas and downloading bathymetry data from GEBCO (General Bathymetric Chart of the Oceans) datasets. The application supports multiple data sources and output formats, allowing users to extract specific subsets of bathymetry data based on measurement types.
+The World Bathymetry Downloader provides an intuitive graphical interface for selecting geographic areas and downloading bathymetry data from web based data services which currently includes the GEBCO (General Bathymetric Chart of the Oceans) datasets. The application supports multiple data sources and output formats, allowing users to extract specific subsets of bathymetry data based on measurement types.
 
 ### Data Set Attribution
 
