@@ -77,7 +77,7 @@ The application interface is organized into several panels:
 
 - **Left Panel**:
   - **Map Panel**: Interactive map display with selection tools, Legend and AoI checkboxes, and buttons (Zoom to Full Extent, Clear Selection, Refresh Map, Save Map to PNG)
-  - **Data Set Attribution**: Groupbox below the map showing dataset citation with clickable DOI link (green text)
+  - **Data Set Attribution**: Groupbox below the map showing dataset citation with clickable DOI link (orange text)
 - **Right Panel**: Contains controls and information
   - **Data Source**: Dropdown to select GEBCO 2025 or GEBCO 2025 TID
   - **Selected Area**: Coordinate display and editing (West, South, East, North)
@@ -102,6 +102,7 @@ The application interface is organized into several panels:
 - **Save Map to PNG**: Export the current map display to a PNG file (user chooses location and filename)
 - **Startup map tips**: When the map first loads, the Activity Log shows a short tip in orange explaining how to Pan, Zoom, and Select an Area of Interest
 - **Configuration**: The application saves settings (e.g. output directory) to `worldbathy_downloader_config.json` in the application directory
+- **Dark theme**: The application uses the Qt Fusion style with a dark palette for a consistent look across Windows, macOS, and Linux
 
 ## Installation
 
@@ -150,7 +151,7 @@ To create a standalone Windows executable (.exe) file:
    C:\Users\pjohnson\PycharmProjects\.venv\Scripts\python.exe -m PyInstaller WorldBathy_Downloader.spec --clean --noconfirm
    ```
 
-4. **Find the executable**: The built executable will be located in the `dist` folder as **WorldBathy_V** followed by the version from `main.py` (e.g., `WorldBathy_V2026.2.exe`)
+4. **Find the executable**: The built executable will be located in the `dist` folder as **WorldBathy_Downloader_v** followed by the version from `main.py` (e.g., `WorldBathy_Downloader_v2026.03.exe`)
 
 The executable includes:
 - All required dependencies bundled (PyQt6, rasterio, numpy, pyproj, etc.)
@@ -159,7 +160,7 @@ The executable includes:
 - Single-file distribution (all dependencies included)
 - Version number automatically extracted from `main.py` and included in the filename
 
-**Note**: The first build may take several minutes as PyInstaller analyzes and bundles all dependencies. Subsequent builds are faster. The build script uses the `WorldBathy_Downloader.spec` file; the output executable is named **WorldBathy_V** + version (e.g. `WorldBathy_V2026.2.exe`) and includes necessary hidden imports for rasterio submodules.
+**Note**: The first build may take several minutes as PyInstaller analyzes and bundles all dependencies. Subsequent builds are faster. The build script uses the `WorldBathy_Downloader.spec` file; the output executable is named **WorldBathy_Downloader_v** + version (e.g. `WorldBathy_Downloader_v2026.03.exe`) and includes necessary hidden imports for rasterio submodules.
 
 ### Building a Mac App
 
@@ -188,7 +189,7 @@ To create a macOS application (.app bundle):
    pyinstaller WorldBathy_Downloader.spec --clean --noconfirm
    ```
 
-3. **Find the app bundle**: The built app will be located in the `dist` folder with a versioned name (e.g., `WorldBathy_V2026.2.app`)
+3. **Find the app bundle**: The built app will be located in the `dist` folder with a versioned name (e.g., `WorldBathy_Downloader_v2026.03.app`)
 
 **Mac-Specific Notes**:
 - The app bundle is a directory that macOS treats as a single application
@@ -260,7 +261,7 @@ The Activity Log provides real-time feedback on operations:
 
 The **Data Set Attribution** groupbox appears below the Map panel and displays:
 - Dataset citation text (e.g., "GEBCO Compilation Group (2025) GEBCO 2025 Grid")
-- Clickable DOI link (green text) that opens the dataset citation page in your web browser
+- Clickable DOI link (orange text) that opens the dataset citation page in your web browser
 - Attribution text updates automatically when switching between data sources
 
 ## File Naming Convention
@@ -348,6 +349,7 @@ University of New Hampshire
 
 ## Version History
 
+- **2026.03** - Added Fusion dark mode (consistent across platforms), light palette for matplotlib windows, attribution text in orange, exe naming WorldBathy_Downloader_v + version
 - **2026.2** - Enhanced with multiple output types, data attribution, improved UI, WorldBathy naming (executable and config), and executable build improvements
 - **2026.1** - First release
 

@@ -1,6 +1,6 @@
 # Building the WorldBathy Executable
 
-This guide explains how to create a standalone Windows executable (.exe) file from the World Bathymetry Downloader application. The built executable is named **WorldBathy_V** followed by the version from `main.py` (e.g. `WorldBathy_V2026.2.exe`).
+This guide explains how to create a standalone Windows executable (.exe) file from the World Bathymetry Downloader application. The built executable is named **WorldBathy_Downloader_v** followed by the version from `main.py` (e.g. `WorldBathy_Downloader_v2026.03.exe`).
 
 ## Prerequisites
 
@@ -104,10 +104,10 @@ C:\Users\pjohnson\PycharmProjects\.venv\Scripts\python.exe -m PyInstaller WorldB
 After a successful build, the executable will be in the `dist` folder:
 
 ```
-dist\WorldBathy_V<version>.exe
+dist\WorldBathy_Downloader_v<version>.exe
 ```
 
-For example: `dist\WorldBathy_V2026.2.exe`
+For example: `dist\WorldBathy_Downloader_v2026.03.exe`
 
 The version number is automatically extracted from the `__version__` variable in `main.py`.
 
@@ -193,7 +193,7 @@ After building, you'll see:
 ├── build/                    # Temporary build files (can be deleted)
 │   └── WorldBathy_Downloader/
 ├── dist/                     # Final executable location
-│   └── WorldBathy_V2026.2.exe
+│   └── WorldBathy_Downloader_v2026.03.exe
 ├── WorldBathy_Downloader.spec # PyInstaller configuration
 ├── build_exe.bat             # Build script
 └── worldbathy_downloader_config.json  # App config (created at runtime if missing)
@@ -239,10 +239,10 @@ This will show a console window with error messages and print statements.
 The executable name includes the version number from `main.py`:
 
 ```python
-__version__ = "2026.2"
+__version__ = "2026.03"
 ```
 
-The spec file automatically extracts this and creates: `WorldBathy_V2026.2.exe`
+The spec file automatically extracts this and creates: `WorldBathy_Downloader_v2026.03.exe`
 
 To update the version:
 1. Edit `__version__` in `main.py`
@@ -261,6 +261,6 @@ Building the executable is straightforward:
 
 1. Use the build script: `build_exe.bat`
 2. Or manually: `C:\Users\pjohnson\PycharmProjects\.venv\Scripts\python.exe -m PyInstaller WorldBathy_Downloader.spec --clean --noconfirm` (adjust the Python path if your venv is elsewhere)
-3. Find the executable in `dist\WorldBathy_V<version>.exe`
+3. Find the executable in `dist\WorldBathy_Downloader_v<version>.exe`
 
 The executable is self-contained and ready for distribution. At runtime it reads/writes settings (e.g. output directory) from `worldbathy_downloader_config.json` in the same directory as the .exe.

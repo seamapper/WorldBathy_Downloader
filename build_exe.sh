@@ -40,6 +40,6 @@ fi
 
 echo ""
 echo "Build completed successfully!"
-echo "The executable name includes the version from main.py (e.g. WorldBathy_V2026.2)."
-echo "Output is in the 'dist' folder (e.g. dist/WorldBathy_V2026.2.app on macOS)."
+echo "The executable name includes the version from main.py (e.g. WorldBathy_Downloader_v2026.03)."
+echo "Output is in the 'dist' folder (e.g. dist/WorldBathy_Downloader_v2026.03.app on macOS)."
 echo ""

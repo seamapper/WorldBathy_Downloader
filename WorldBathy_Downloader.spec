@@ -79,7 +79,7 @@ exe = EXE(
     a.zipfiles,
     a.datas,
     [],
-    name=f'WorldBathy_V{version}',
+    name=f'WorldBathy_Downloader_v{version}',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

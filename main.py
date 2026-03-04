@@ -29,7 +29,8 @@ See LICENSE file for full license text.
 """
 
 # __version__ = "2026.1" # First release of the program
-__version__ = "2026.2" # Cleaned up the program and added licensing information
+# __version__ = "2026.2" # Cleaned up the program and added licensing information
+__version__ = "2026.03" # Added dark mode and light mode for matplotlib windows
 
 import sys
 import os
@@ -47,9 +48,9 @@ if getattr(sys, 'frozen', False):
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                              QHBoxLayout, QGridLayout, QLabel, QLineEdit, QPushButton, 
                              QFileDialog, QComboBox, QProgressBar, QTextEdit,
-                             QGroupBox, QMessageBox, QCheckBox, QSizePolicy)
+                             QGroupBox, QMessageBox, QCheckBox, QSizePolicy, QStyleFactory)
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer, QUrl
-from PyQt6.QtGui import QDesktopServices, QMouseEvent
+from PyQt6.QtGui import QDesktopServices, QMouseEvent, QPalette, QColor
 from map_widget import MapWidget
 from download_module import BathymetryDownloader
 import requests
@@ -249,7 +250,7 @@ class MainWindow(QMainWindow):
         attribution_layout.setSpacing(0)  # No spacing between items
         self.attribution_label = ClickableLabel()
         self.attribution_label.setWordWrap(True)
-        self.attribution_label.setStyleSheet("color: green; text-decoration: underline; cursor: pointer; padding: 0px; margin: 0px; border: none;")
+        self.attribution_label.setStyleSheet("color: orange; text-decoration: underline; cursor: pointer; padding: 0px; margin: 0px; border: none;")
         self.attribution_label.setContentsMargins(0, 0, 0, 0)  # Remove any label margins
         self.attribution_label.clicked.connect(self._open_attribution_url)
         self._current_attribution_url = None  # Store current attribution URL
@@ -1818,9 +1819,47 @@ class MainWindow(QMainWindow):
             self._pending_selection = None
 
 
+def dark_fusion_palette():
+    """Return a dark QPalette for use with Fusion style (consistent across platforms)."""
+    p = QPalette()
+    p.setColor(QPalette.ColorRole.Window, QColor(53, 53, 53))
+    p.setColor(QPalette.ColorRole.WindowText, Qt.GlobalColor.white)
+    p.setColor(QPalette.ColorRole.Base, QColor(25, 25, 25))
+    p.setColor(QPalette.ColorRole.AlternateBase, QColor(53, 53, 53))
+    p.setColor(QPalette.ColorRole.ToolTipBase, Qt.GlobalColor.white)
+    p.setColor(QPalette.ColorRole.ToolTipText, Qt.GlobalColor.white)
+    p.setColor(QPalette.ColorRole.Text, Qt.GlobalColor.white)
+    p.setColor(QPalette.ColorRole.Button, QColor(53, 53, 53))
+    p.setColor(QPalette.ColorRole.ButtonText, Qt.GlobalColor.white)
+    p.setColor(QPalette.ColorRole.BrightText, Qt.GlobalColor.red)
+    p.setColor(QPalette.ColorRole.Link, QColor(42, 130, 218))
+    p.setColor(QPalette.ColorRole.Highlight, QColor(42, 130, 218))
+    p.setColor(QPalette.ColorRole.HighlightedText, Qt.GlobalColor.white)
+    return p
+
+
+def light_palette_for_matplotlib_window():
+    """Return a light QPalette. Use this for any window that embeds matplotlib so plots stay light."""
+    p = QPalette()
+    p.setColor(QPalette.ColorRole.Window, Qt.GlobalColor.white)
+    p.setColor(QPalette.ColorRole.WindowText, Qt.GlobalColor.black)
+    p.setColor(QPalette.ColorRole.Base, Qt.GlobalColor.white)
+    p.setColor(QPalette.ColorRole.AlternateBase, QColor(240, 240, 240))
+    p.setColor(QPalette.ColorRole.Text, Qt.GlobalColor.black)
+    p.setColor(QPalette.ColorRole.Button, QColor(240, 240, 240))
+    p.setColor(QPalette.ColorRole.ButtonText, Qt.GlobalColor.black)
+    p.setColor(QPalette.ColorRole.Highlight, QColor(42, 130, 218))
+    p.setColor(QPalette.ColorRole.HighlightedText, Qt.GlobalColor.white)
+    return p
+
+
 def main():
     """Main entry point."""
     app = QApplication(sys.argv)
+    # Use Fusion style + dark palette for consistent dark look across platforms
+    if "Fusion" in QStyleFactory.keys():
+        app.setStyle("Fusion")
+    app.setPalette(dark_fusion_palette())
     window = MainWindow()
     window.show()
     sys.exit(app.exec())

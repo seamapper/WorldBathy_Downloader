@@ -1,6 +1,6 @@
 # Building the WorldBathy Mac App
 
-This guide explains how to create a macOS application (.app bundle) from the World Bathymetry Downloader application. The built app is named **WorldBathy_V** followed by the version from `main.py` (e.g. `WorldBathy_V2026.2.app`).
+This guide explains how to create a macOS application (.app bundle) from the World Bathymetry Downloader application. The built app is named **WorldBathy_Downloader_v** followed by the version from `main.py` (e.g. `WorldBathy_Downloader_v2026.03.app`).
 
 ## Prerequisites
 
@@ -99,10 +99,10 @@ pyinstaller WorldBathy_Downloader.spec --clean --noconfirm
 After a successful build, the Mac app bundle will be in the `dist` folder:
 
 ```
-dist/WorldBathy_V<version>.app
+dist/WorldBathy_Downloader_v<version>.app
 ```
 
-For example: `dist/WorldBathy_V2026.2.app`
+For example: `dist/WorldBathy_Downloader_v2026.03.app`
 
 The version number is automatically extracted from the `__version__` variable in `main.py`.
 
@@ -111,11 +111,11 @@ The version number is automatically extracted from the `__version__` variable in
 A macOS `.app` bundle is actually a directory with a specific structure:
 
 ```
-WorldBathy_V2026.2.app/
+WorldBathy_Downloader_v2026.03.app/
 ├── Contents/
 │   ├── Info.plist          # App metadata
 │   ├── MacOS/              # Executable binary
-│   │   └── WorldBathy_V2026.2
+│   │   └── WorldBathy_Downloader_v2026.03
 │   ├── Resources/          # Resources (icons, data files)
 │   │   └── CCOM.icns      # App icon (if converted)
 │   └── Frameworks/         # Bundled frameworks
@@ -123,7 +123,7 @@ WorldBathy_V2026.2.app/
 
 You can explore the bundle:
 ```bash
-open dist/WorldBathy_V2026.2.app/Contents
+open dist/WorldBathy_Downloader_v2026.03.app/Contents
 ```
 
 ## Mac-Specific Considerations
@@ -173,12 +173,12 @@ For distribution outside the App Store, code signing helps users trust your app:
 
 2. **Sign the app**:
    ```bash
-   codesign --deep --force --verify --verbose --sign "Developer ID Application: Your Name" dist/WorldBathy_V2026.2.app
+   codesign --deep --force --verify --verbose --sign "Developer ID Application: Your Name" dist/WorldBathy_Downloader_v2026.03.app
    ```
 
 3. **Verify signing**:
    ```bash
-   codesign --verify --verbose dist/WorldBathy_V2026.2.app
+   codesign --verify --verbose dist/WorldBathy_Downloader_v2026.03.app
    ```
 
 ### Notarization (For Distribution)
@@ -187,7 +187,7 @@ If distributing outside the App Store, notarization is required for macOS 10.15+
 
 1. **Create a zip file**:
    ```bash
-   ditto -c -k --keepParent dist/WorldBathy_V2026.2.app WorldBathy_V2026.2.zip
+   ditto -c -k --keepParent dist/WorldBathy_Downloader_v2026.03.app WorldBathy_Downloader_v2026.03.zip
    ```
 
 2. **Submit for notarization**:
@@ -196,7 +196,7 @@ If distributing outside the App Store, notarization is required for macOS 10.15+
      --primary-bundle-id "edu.unh.ccom.worldbathy" \
      --username "your-apple-id@example.com" \
      --password "@keychain:AC_PASSWORD" \
-     --file WorldBathy_V2026.2.zip
+     --file WorldBathy_Downloader_v2026.03.zip
    ```
 
 3. **Check notarization status**:
@@ -208,7 +208,7 @@ If distributing outside the App Store, notarization is required for macOS 10.15+
 
 4. **Staple the notarization ticket**:
    ```bash
-   xcrun stapler staple dist/WorldBathy_V2026.2.app
+   xcrun stapler staple dist/WorldBathy_Downloader_v2026.03.app
    ```
 
 **Note**: Notarization requires an Apple Developer account and can take 10-30 minutes.
@@ -230,7 +230,7 @@ After this, you can double-click normally.
 If you built the app yourself, you can remove the quarantine attribute:
 
 ```bash
-xattr -cr dist/WorldBathy_V2026.2.app
+xattr -cr dist/WorldBathy_Downloader_v2026.03.app
 ```
 
 ## Troubleshooting
@@ -259,7 +259,7 @@ xattr -cr dist/WorldBathy_V2026.2.app
 
 **Solution**:
 - Right-click → "Open" → "Open" (first time only)
-- Or remove quarantine: `xattr -cr dist/WorldBathy_V2026.2.app`
+- Or remove quarantine: `xattr -cr dist/WorldBathy_Downloader_v2026.03.app`
 - Or code sign the app (see Code Signing section above)
 
 ### App Crashes on Launch
@@ -270,7 +270,7 @@ xattr -cr dist/WorldBathy_V2026.2.app
 1. **Check Console.app**: Open Console.app and look for crash logs
 2. **Run from Terminal**: Launch from Terminal to see error messages:
    ```bash
-   dist/WorldBathy_V2026.2.app/Contents/MacOS/WorldBathy_V2026.2
+   dist/WorldBathy_Downloader_v2026.03.app/Contents/MacOS/WorldBathy_Downloader_v2026.03
    ```
 3. **Build with console enabled**: Edit the spec file temporarily:
    - Change `console=False` to `console=True`
@@ -314,7 +314,7 @@ To create a disk image (.dmg) for easy distribution:
 1. **Create a temporary directory structure**:
    ```bash
    mkdir -p dmg_build
-   cp -R dist/WorldBathy_V2026.2.app dmg_build/
+   cp -R dist/WorldBathy_Downloader_v2026.03.app dmg_build/
    ```
 
 2. **Create a symbolic link to Applications**:
@@ -327,7 +327,7 @@ To create a disk image (.dmg) for easy distribution:
    hdiutil create -volname "WorldBathy" \
      -srcfolder dmg_build \
      -ov -format UDZO \
-     WorldBathy_V2026.2.dmg
+     WorldBathy_Downloader_v2026.03.dmg
    ```
 
 4. **Clean up**:
@@ -344,7 +344,7 @@ After building, you'll see:
 ├── build/                    # Temporary build files (can be deleted)
 │   └── WorldBathy_Downloader/
 ├── dist/                     # Final app bundle location
-│   └── WorldBathy_V2026.2.app
+│   └── WorldBathy_Downloader_v2026.03.app
 ├── WorldBathy_Downloader.spec # PyInstaller configuration
 ├── build_exe.sh              # Build script
 └── worldbathy_downloader_config.json  # App config (created at runtime if missing)
@@ -385,7 +385,7 @@ The spec file works cross-platform, but you may want Mac-specific tweaks:
    ```python
    app = BUNDLE(
        exe,
-       name='WorldBathy_V2026.2',
+       name='WorldBathy_Downloader_v2026.03',
        icon='media/CCOM.icns',
        bundle_identifier='edu.unh.ccom.worldbathy',
        info_plist={
@@ -420,11 +420,11 @@ To build a universal binary that works on both Apple Silicon and Intel Macs:
    ```bash
    # Build for Apple Silicon
    arch -arm64 pyinstaller WorldBathy_Downloader.spec
-   mv dist/WorldBathy_V2026.2.app dist/WorldBathy_V2026.2_arm64.app
+   mv dist/WorldBathy_Downloader_v2026.03.app dist/WorldBathy_Downloader_v2026.03_arm64.app
    
    # Build for Intel
    arch -x86_64 pyinstaller WorldBathy_Downloader.spec
-   mv dist/WorldBathy_V2026.2.app dist/WorldBathy_V2026.2_x86_64.app
+   mv dist/WorldBathy_Downloader_v2026.03.app dist/WorldBathy_Downloader_v2026.03_x86_64.app
    
    # Create universal binary (requires lipo)
    # This is complex and may require manual framework merging
@@ -437,10 +437,10 @@ To build a universal binary that works on both Apple Silicon and Intel Macs:
 The app name includes the version number from `main.py`:
 
 ```python
-__version__ = "2026.2"
+__version__ = "2026.03"
 ```
 
-The spec file automatically extracts this and creates: `WorldBathy_V2026.2.app`
+The spec file automatically extracts this and creates: `WorldBathy_Downloader_v2026.03.app`
 
 To update the version:
 1. Edit `__version__` in `main.py`
@@ -460,6 +460,6 @@ Building the Mac app is straightforward:
 
 1. Use the build script: `./build_exe.sh`
 2. Or manually: `pyinstaller WorldBathy_Downloader.spec --clean --noconfirm`
-3. Find the app in `dist/WorldBathy_V<version>.app`
+3. Find the app in `dist/WorldBathy_Downloader_v<version>.app`
 
 The app is self-contained and ready for distribution. At runtime it reads/writes settings (e.g. output directory) from `worldbathy_downloader_config.json` in the same directory as the .app (or in the current working directory when launched). For production distribution, consider code signing and notarization.
