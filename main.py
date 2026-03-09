@@ -30,20 +30,18 @@ See LICENSE file for full license text.
 
 # __version__ = "2026.1" # First release of the program
 # __version__ = "2026.2" # Cleaned up the program and added licensing information
-__version__ = "2026.03" # Added dark mode and light mode for matplotlib windows
+#  __version__ = "2026.03" # Added dark mode and light mode for matplotlib windows
+__version__ = "2026.04" #  Fixed the missing proj.db issue
 
 import sys
 import os
 
-# Set PROJ_LIB environment variable for PyInstaller builds
-# This ensures pyproj can find its data files when running as an executable
-if getattr(sys, 'frozen', False):
-    # Running as compiled executable
-    if hasattr(sys, '_MEIPASS'):
-        # PyInstaller creates a temp folder and stores path in _MEIPASS
-        proj_data_path = os.path.join(sys._MEIPASS, 'proj')
-        if os.path.exists(proj_data_path):
-            os.environ['PROJ_LIB'] = proj_data_path
+# Set PROJ_LIB and PROJ_DATA for PyInstaller builds so pyproj/rasterio find proj.db
+if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+    proj_data_path = os.path.join(sys._MEIPASS, 'proj')
+    if os.path.exists(proj_data_path):
+        os.environ['PROJ_LIB'] = proj_data_path
+        os.environ['PROJ_DATA'] = proj_data_path
 
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                              QHBoxLayout, QGridLayout, QLabel, QLineEdit, QPushButton, 

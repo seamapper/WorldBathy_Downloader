@@ -2,6 +2,19 @@
 
 # Extract version from main.py
 import re
+import os
+
+# Bundle pyproj data (proj.db etc.) so the frozen exe can find CRS data
+try:
+    import pyproj
+    _proj_data_dir = pyproj.datadir.get_data_dir()
+    if _proj_data_dir and os.path.isdir(_proj_data_dir):
+        _proj_datas = [(_proj_data_dir, 'proj')]
+    else:
+        _proj_datas = []
+except Exception:
+    _proj_datas = []
+
 with open('main.py', 'r', encoding='utf-8') as f:
     content = f.read()
     # Find uncommented __version__ line (not starting with #)
@@ -24,7 +37,7 @@ a = Analysis(
     ['main.py'],
     pathex=[],
     binaries=[],
-    datas=[],
+    datas=_proj_datas,
     hiddenimports=[
         'rasterio',
         'rasterio.sample',
