@@ -193,6 +193,7 @@ class MapTileLoader(QThread):
 class MapServerLoader(QThread):
     """Load a single image from an ArcGIS MapServer (e.g. GEBCO Haxby). Bbox in GCS (4326)."""
     tileLoaded = pyqtSignal(QPixmap, float, float, float, float)  # pixmap, west, south, east, north
+    statusMessage = pyqtSignal(str)  # Status/log messages for Activity Log
 
     def __init__(self, map_server_url, bbox_4326, size, transparent=False):
         super().__init__()
@@ -200,6 +201,8 @@ class MapServerLoader(QThread):
         self.bbox_4326 = bbox_4326  # (west, south, east, north) in degrees
         self.size = size
         self.transparent = transparent  # Whether to request transparent PNG
+        self.max_retries = 3
+        self.retry_delay_seconds = 1.0
 
     def run(self):
         try:
@@ -219,8 +222,36 @@ class MapServerLoader(QThread):
                 "f": "image",
                 "transparent": "true" if self.transparent else "false",
             }
-            response = requests.get(url, params=params, timeout=60)
-            response.raise_for_status()
+            response = None
+            for attempt in range(1, self.max_retries + 1):
+                try:
+                    response = requests.get(url, params=params, timeout=60)
+                    response.raise_for_status()
+                    break
+                except requests.exceptions.HTTPError as http_err:
+                    status_code = getattr(http_err.response, "status_code", None)
+                    is_retryable = status_code in (500, 502, 503, 504)
+                    if is_retryable and attempt < self.max_retries:
+                        self.statusMessage.emit(
+                            f'<span style="color: orange;">Warning: Map server returned {status_code}. '
+                            f"Retrying ({attempt + 1}/{self.max_retries})...</span>"
+                        )
+                        QThread.msleep(int(self.retry_delay_seconds * 1000 * attempt))
+                        continue
+                    raise
+                except (requests.exceptions.Timeout, requests.exceptions.ConnectionError):
+                    if attempt < self.max_retries:
+                        self.statusMessage.emit(
+                            f'<span style="color: orange;">Warning: Map server request timed out/connection failed. '
+                            f"Retrying ({attempt + 1}/{self.max_retries})...</span>"
+                        )
+                        QThread.msleep(int(self.retry_delay_seconds * 1000 * attempt))
+                        continue
+                    raise
+
+            if response is None:
+                raise RuntimeError("Map server request failed without a response.")
+
             img = Image.open(BytesIO(response.content))
             img_bytes = BytesIO()
             img.save(img_bytes, format="PNG")
@@ -237,6 +268,9 @@ class MapServerLoader(QThread):
             self.tileLoaded.emit(pixmap, west, south, east, north)
         except Exception as e:
             print(f"MapServerLoader error: {e}")
+            self.statusMessage.emit(
+                f'<span style="color: orange;">Warning: Map load problem ({e}). Please try again.</span>'
+            )
             self.tileLoaded.emit(QPixmap(), *self.bbox_4326)
 
 
@@ -479,6 +513,7 @@ class MapWidget(QWidget):
                 print("Loading land basemap (GCS)...")
                 # Land layer: opaque (transparent=False) so it's always visible
                 self.basemap_loader = MapServerLoader(self.land_display_url, requested_extent, size, transparent=False)
+                self.basemap_loader.statusMessage.connect(self.statusMessage.emit)
                 # MapServerLoader emits (pixmap, west, south, east, north); extract just pixmap
                 self.basemap_loader.tileLoaded.connect(lambda pixmap, *args: self.on_basemap_loaded(pixmap))
                 self.basemap_loader.finished.connect(self._check_all_loaders_finished)
@@ -487,6 +522,7 @@ class MapWidget(QWidget):
             print("Loading display layer (GCS)...")
             # Bathymetry layer: transparent (transparent=True) so land shows through
             self.loader = MapServerLoader(self.display_url, requested_extent, size, transparent=True)
+            self.loader.statusMessage.connect(self.statusMessage.emit)
             self.loader.tileLoaded.connect(self.on_tile_loaded)
             self.loader.finished.connect(self.on_loader_finished)
             self.loader.finished.connect(self._check_all_loaders_finished)

@@ -31,7 +31,8 @@ See LICENSE file for full license text.
 # __version__ = "2026.1" # First release of the program
 # __version__ = "2026.2" # Cleaned up the program and added licensing information
 #  __version__ = "2026.03" # Added dark mode and light mode for matplotlib windows
-__version__ = "2026.04" #  Fixed the missing proj.db issue
+# __version__ = "2026.04" #  Fixed the missing proj.db issue
+__version__ = "2026.05" #  Fixed a timeout issue
 
 import sys
 import os
