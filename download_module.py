@@ -16,6 +16,12 @@ from io import BytesIO
 from PIL import Image
 import pyproj
 from PyQt6.QtCore import QThread, pyqtSignal
+from urllib.parse import urlencode
+
+
+def _format_rest_url(url, params):
+    """Build a full REST request URL for activity log display."""
+    return f"{url}?{urlencode(params)}"
 
 
 class BathymetryDownloader(QThread):
@@ -29,7 +35,7 @@ class BathymetryDownloader(QThread):
     def __init__(self, base_url, bbox, output_path, output_crs="EPSG:3857", 
                  pixel_size=None, max_size=14000, use_tile_download=False,
                  bbox_in_4326=False, pixel_size_degrees=None, tid_url=None, download_mode="combined",
-                 output_requests=None):
+                 output_requests=None, ignore_source_nodata=False):
         super().__init__()
         self.base_url = base_url
         self.bbox = bbox  # (xmin, ymin, xmax, ymax) in EPSG:3857 or 4326 when bbox_in_4326
@@ -43,20 +49,54 @@ class BathymetryDownloader(QThread):
         self.tile_overlap = 5
         self.tile_max_size = 2000
         self.cancelled = False
-        self.tid_url = tid_url  # GEBCO 2025 TID ImageServer URL for bathymetry_only / land_only
+        self.tid_url = tid_url  # GEBCO TID ImageServer URL for bathymetry_only / land_only
         self.download_mode = download_mode  # used when output_requests is None
+        self.ignore_source_nodata = ignore_source_nodata
         # output_requests: list of (mode, path) e.g. [("combined", path1), ("bathymetry_only", path2)]
         self.output_requests = output_requests if output_requests else None
-        # Force int8 for GEBCO 2025 TID (signed 8-bit), int16 for other GEBCO 2025 (signed 16-bit)
-        if "GEBCO" in base_url and "2025" in base_url and "TID" in base_url:
+        # Force int8 for GEBCO TID grids (signed 8-bit), int16 for other GEBCO bathymetry grids
+        base_url_upper = base_url.upper()
+        if "GEBCO" in base_url_upper and "TID" in base_url_upper:
             self._preserve_int8 = True
             self._preserve_int16 = False
-        elif "GEBCO" in base_url and "2025" in base_url:
+        elif "GEBCO" in base_url_upper and ("2025" in base_url or "2026" in base_url):
             self._preserve_int8 = False
             self._preserve_int16 = True
         else:
             self._preserve_int8 = False
             self._preserve_int16 = False
+
+            self._preserve_int16 = False
+
+    def _read_exported_tiff_array(self, content):
+        """Read a downloaded export TIFF, preserving integer dtypes."""
+        with rasterio.open(BytesIO(content)) as src:
+            original_dtype = src.dtypes[0]
+            img_array = src.read(1)
+            transform = src.transform if src.transform else None
+            crs = src.crs if src.crs else None
+
+            if not self._preserve_int8 and not self._preserve_int16:
+                if np.issubdtype(original_dtype, np.integer):
+                    self._preserve_int8 = original_dtype == np.int8
+                    self._preserve_int16 = original_dtype == np.int16
+
+            if self.ignore_source_nodata:
+                if np.issubdtype(img_array.dtype, np.integer):
+                    return img_array, None, transform, crs
+                return img_array.astype(np.float32), None, transform, crs
+
+            source_nodata = src.nodata
+            if source_nodata is not None:
+                if np.issubdtype(img_array.dtype, np.integer):
+                    img_array = img_array.astype(np.float32)
+                    img_array = np.where(img_array == source_nodata, np.nan, img_array)
+                else:
+                    img_array = np.where(img_array == source_nodata, np.nan, img_array)
+            elif not np.issubdtype(img_array.dtype, np.floating):
+                img_array = img_array.astype(np.float32)
+
+            return img_array, source_nodata, transform, crs
         
     def cancel(self):
         """Cancel the download."""
@@ -69,11 +109,12 @@ class BathymetryDownloader(QThread):
             "size": f"{width},{height}",
             "format": "tiff",
             "f": "image",
-            "noData": "true",
             "interpolation": "RSP_BilinearInterpolation",
         }
         if self.bbox_in_4326:
             params["bboxSR"] = "4326"
+        if not self.ignore_source_nodata:
+            params["noData"] = "true"
         return params
         
     def run(self):
@@ -131,6 +172,7 @@ class BathymetryDownloader(QThread):
                 
                 # First, try to get raw TIFF data
                 params = self._export_image_params(xmin, ymin, xmax, ymax, width, height)
+                self.status.emit(f"Data REST (download): {_format_rest_url(url, params)}")
                 
                 # Don't specify rasterFunction to get raw values
                 # The service should return raw F32 values
@@ -174,64 +216,9 @@ class BathymetryDownloader(QThread):
                     if 'tiff' in content_type.lower() or response.content[:4] == b'II*\x00' or response.content[:4] == b'MM\x00*':
                         # We got a TIFF, try to read it with rasterio
                         try:
-                            with rasterio.open(BytesIO(response.content)) as src:
-                                # Preserve original data type, especially int16 for GEBCO 2025
-                                original_dtype = src.dtypes[0]
-                                img_array = src.read(1)
-                                
-                                # Preserve NoData value from source
-                                # For GEBCO 2025 (int16/int8), ignore nodata=0 since 0 is a valid value
-                                if src.nodata is not None:
-                                    source_nodata = src.nodata
-                                    # Only mask nodata if it's not 0 (0 is valid for bathymetry/TID)
-                                    # For GEBCO 2025, we'll use -32768 (int16) or -128 (int8) as nodata instead
-                                    if (self._preserve_int16 or self._preserve_int8) and source_nodata == 0:
-                                        # Ignore nodata=0 for GEBCO 2025, 0 is a valid value
-                                        source_nodata = None
-                                    elif source_nodata != 0:
-                                        # For integer types, mask NoData values with NaN temporarily
-                                        # We'll convert NaN to nodata value when writing
-                                        if np.issubdtype(img_array.dtype, np.integer):
-                                            # For integer arrays, use a sentinel value instead of NaN
-                                            # Store the nodata value and we'll handle it during write
-                                            img_array = img_array.astype(np.float32)
-                                            img_array = np.where(img_array == source_nodata, np.nan, img_array)
-                                        else:
-                                            # For float arrays, use NaN directly
-                                            img_array = np.where(img_array == source_nodata, np.nan, img_array)
-                                    else:
-                                        # nodata is 0 but not GEBCO 2025, still mask it
-                                        if np.issubdtype(img_array.dtype, np.integer):
-                                            img_array = img_array.astype(np.float32)
-                                            img_array = np.where(img_array == source_nodata, np.nan, img_array)
-                                        else:
-                                            img_array = np.where(img_array == source_nodata, np.nan, img_array)
-                                else:
-                                    source_nodata = None
-                                
-                                # Convert to float32 for processing if needed
-                                if not np.issubdtype(img_array.dtype, np.floating):
-                                    img_array = img_array.astype(np.float32)
-                                
-                                # Use the transform and CRS from the downloaded TIFF if available
-                                if hasattr(src, 'transform') and src.transform:
-                                    transform = src.transform
-                                if hasattr(src, 'crs') and src.crs:
-                                    downloaded_crs = src.crs
-                                
-                                # Store original dtype for later use
-                                if 'source_nodata' not in locals():
-                                    source_nodata = None
-                                # Only update preserve_int8/int16 flags if not already set (e.g., for GEBCO 2025)
-                                # If already set to True (from __init__), keep it True
-                                if not self._preserve_int8 and not self._preserve_int16:
-                                    if np.issubdtype(original_dtype, np.integer):
-                                        # Preserve integer type info
-                                        self._preserve_int8 = (original_dtype == np.int8)
-                                        self._preserve_int16 = (original_dtype == np.int16)
-                                    else:
-                                        self._preserve_int8 = False
-                                        self._preserve_int16 = False
+                            img_array, source_nodata, transform, downloaded_crs = self._read_exported_tiff_array(
+                                response.content
+                            )
                         except Exception as e:
                             self.status.emit(f"Could not read TIFF with rasterio: {e}. Trying PIL...")
                             # Fall back to PIL
@@ -499,6 +486,9 @@ class BathymetryDownloader(QThread):
             img_array = img_array[:, :, 0]
         elif len(img_array.shape) != 2:
             raise ValueError(f"Unexpected array shape: {img_array.shape}")
+
+        has_masked_nans = np.issubdtype(img_array.dtype, np.floating) and np.any(np.isnan(img_array))
+
         if preserve_int8:
             nodata_value = -128
             output_dtype = np.int8
@@ -508,41 +498,52 @@ class BathymetryDownloader(QThread):
         else:
             nodata_value = -9999.0
             output_dtype = np.float32
-        if source_nodata is not None:
-            if (preserve_int8 or preserve_int16) and isinstance(source_nodata, (int, np.integer)):
+
+        # GEBCO grids use 0 as a valid elevation/TID value; never adopt source nodata=0.
+        if (
+            source_nodata is not None
+            and source_nodata != 0
+            and not self.ignore_source_nodata
+        ):
+            if preserve_int8 or preserve_int16:
                 nodata_value = int(source_nodata)
-            elif not (preserve_int8 or preserve_int16):
+            else:
                 nodata_value = float(source_nodata)
-        else:
-            if img_array.dtype == np.uint8 or (img_array.size and img_array.max() <= 255 and img_array.min() >= 0):
-                if preserve_int8:
-                    nodata_value = -128
-                elif preserve_int16:
-                    nodata_value = -32768
-                else:
-                    nodata_value = 0.0
+
         img_array_for_write = img_array.copy()
-        if np.any(np.isnan(img_array_for_write)):
+        if has_masked_nans:
             img_array_for_write = np.nan_to_num(img_array_for_write, nan=nodata_value)
+
         if preserve_int8:
             img_array_for_write = np.round(img_array_for_write)
-            img_array_for_write = np.clip(img_array_for_write, -128, 127)
+            img_array_for_write = np.clip(img_array_for_write, -127, 127)
             img_array_for_write = img_array_for_write.astype(np.int8)
-            nan_mask = np.isnan(img_array)
-            img_array_for_write[nan_mask] = nodata_value
+            if has_masked_nans:
+                img_array_for_write[np.isnan(img_array)] = nodata_value
         elif preserve_int16:
             img_array_for_write = np.round(img_array_for_write)
-            img_array_for_write = np.clip(img_array_for_write, -32768, 32767)
+            img_array_for_write = np.clip(img_array_for_write, -32767, 32767)
             img_array_for_write = img_array_for_write.astype(np.int16)
-            nan_mask = np.isnan(img_array)
-            img_array_for_write[nan_mask] = nodata_value
+            if has_masked_nans:
+                img_array_for_write[np.isnan(img_array)] = nodata_value
         else:
             if img_array_for_write.dtype != np.float32:
                 img_array_for_write = img_array_for_write.astype(np.float32)
-        with rasterio.open(
-            path, 'w', driver='GTiff', height=height, width=width, count=1,
-            dtype=output_dtype, crs=crs, transform=transform, compress='lzw', nodata=nodata_value
-        ) as dst:
+
+        write_kwargs = {
+            "driver": "GTiff",
+            "height": height,
+            "width": width,
+            "count": 1,
+            "dtype": output_dtype,
+            "crs": crs,
+            "transform": transform,
+            "compress": "lzw",
+        }
+        if has_masked_nans:
+            write_kwargs["nodata"] = nodata_value
+
+        with rasterio.open(path, 'w', **write_kwargs) as dst:
             dst.write(img_array_for_write, 1)
     
     def _download_tiled(self, xmin, ymin, xmax, ymax, total_width, total_height):
@@ -556,6 +557,7 @@ class BathymetryDownloader(QThread):
         tiles_y = int(np.ceil(total_height / self.tile_max_size))
         total_tiles = tiles_x * tiles_y
         
+        self.status.emit(f"Data REST (download, {total_tiles} tiles): {self.base_url.rstrip('/')}/exportImage")
         self.status.emit(f"Downloading {total_tiles} tiles ({tiles_x}x{tiles_y})...")
         self.progress.emit(10)
         
@@ -608,6 +610,8 @@ class BathymetryDownloader(QThread):
                 # Download this tile
                 url = f"{self.base_url}/exportImage"
                 params = self._export_image_params(tile_xmin, tile_ymin, tile_xmax, tile_ymax, tile_width, tile_height)
+                if tile_num == 1:
+                    self.status.emit(f"Data REST (download tile example): {_format_rest_url(url, params)}")
                 
                 try:
                     response = requests.get(url, params=params, timeout=300, stream=True)
@@ -625,37 +629,15 @@ class BathymetryDownloader(QThread):
                     
                     if 'tiff' in content_type.lower() or response.content[:4] == b'II*\x00' or response.content[:4] == b'MM\x00*':
                         try:
-                            with rasterio.open(BytesIO(response.content)) as src:
-                                # Preserve original data type, especially int16 for GEBCO 2025
-                                original_dtype = src.dtypes[0]
-                                tile_array = src.read(1)
-                                
-                                if src.nodata is not None and source_nodata is None:
-                                    source_nodata = src.nodata
-                                    # For GEBCO 2025 (int16/int8), ignore nodata=0 since 0 is a valid value
-                                    if (self._preserve_int16 or self._preserve_int8) and source_nodata == 0:
-                                        source_nodata = None
-                                
-                                # Handle nodata based on data type
-                                if np.issubdtype(tile_array.dtype, np.integer):
-                                    # For integer types, convert to float32 for NaN handling
-                                    tile_array = tile_array.astype(np.float32)
-                                    # Only mask nodata if it's not None and not 0 (for GEBCO 2025)
-                                    if source_nodata is not None and source_nodata != 0:
-                                        tile_array = np.where(tile_array == source_nodata, np.nan, tile_array)
-                                    # Track if we should preserve int8/int16 (only if not already set)
-                                    if not self._preserve_int8 and not self._preserve_int16:
-                                        self._preserve_int8 = (original_dtype == np.int8)
-                                        self._preserve_int16 = (original_dtype == np.int16)
-                                else:
-                                    # For float arrays, use NaN directly (only if nodata is not None and not 0)
-                                    if source_nodata is not None and source_nodata != 0:
-                                        tile_array = np.where(tile_array == source_nodata, np.nan, tile_array)
-                                
-                                if transform is None and hasattr(src, 'transform') and src.transform:
-                                    transform = src.transform
-                                if downloaded_crs is None and hasattr(src, 'crs') and src.crs:
-                                    downloaded_crs = src.crs
+                            tile_array, tile_source_nodata, tile_transform, tile_crs = self._read_exported_tiff_array(
+                                response.content
+                            )
+                            if source_nodata is None and tile_source_nodata is not None:
+                                source_nodata = tile_source_nodata
+                            if transform is None and tile_transform is not None:
+                                transform = tile_transform
+                            if downloaded_crs is None and tile_crs is not None:
+                                downloaded_crs = tile_crs
                         except Exception:
                             img = Image.open(BytesIO(response.content))
                             tile_array = np.array(img, dtype=np.float32)
@@ -689,15 +671,11 @@ class BathymetryDownloader(QThread):
                     # img_array is float32 during processing, tile_data may be float32, int8, or int16
                     output_region = img_array[output_start_y:output_end_y, output_start_x:output_end_x]
                     
-                    # Convert tile_data to float32 if it's int8 or int16
-                    if tile_data.dtype == np.int8:
-                        tile_data_float = tile_data.astype(np.float32)
-                        tile_data_float[tile_data == -128] = np.nan
-                    elif tile_data.dtype == np.int16:
-                        tile_data_float = tile_data.astype(np.float32)
-                        tile_data_float[tile_data == -32768] = np.nan
-                    else:
+                    # Convert tile_data to float32 for overlap blending when needed
+                    if np.issubdtype(tile_data.dtype, np.floating):
                         tile_data_float = tile_data.copy()
+                    else:
+                        tile_data_float = tile_data.astype(np.float32)
                     
                     # Combine: prefer non-NaN values, average if both have values
                     mask_both = ~np.isnan(output_region) & ~np.isnan(tile_data_float)
@@ -724,15 +702,13 @@ class BathymetryDownloader(QThread):
         preserve_int8 = getattr(self, '_preserve_int8', False)
         preserve_int16 = getattr(self, '_preserve_int16', False)
         if preserve_int8:
-            # Convert NaN to nodata, round, and clip to int8 range
             img_array = np.nan_to_num(img_array, nan=-128)
             img_array = np.round(img_array)
-            img_array = np.clip(img_array, -128, 127).astype(np.int8)
+            img_array = np.clip(img_array, -127, 127).astype(np.int8)
         elif preserve_int16:
-            # Convert NaN to nodata, round, and clip to int16 range
             img_array = np.nan_to_num(img_array, nan=-32768)
             img_array = np.round(img_array)
-            img_array = np.clip(img_array, -32768, 32767).astype(np.int16)
+            img_array = np.clip(img_array, -32767, 32767).astype(np.int16)
         
         return img_array, source_nodata, transform, downloaded_crs
     
@@ -740,17 +716,15 @@ class BathymetryDownloader(QThread):
         """Fetch TID grid from TID ImageServer (same bbox and size). Returns 2D array (int8 or float32) or None on error."""
         url = f"{self.tid_url.rstrip('/')}/exportImage"
         params = self._export_image_params(xmin, ymin, xmax, ymax, width, height)
+        self.status.emit(f"Data REST (TID grid): {_format_rest_url(url, params)}")
         try:
             if width <= self.tile_max_size and height <= self.tile_max_size:
                 response = requests.get(url, params=params, timeout=300, stream=True)
                 response.raise_for_status()
                 content_type = response.headers.get('Content-Type', '')
                 if 'tiff' in content_type.lower() or response.content[:4] in (b'II*\x00', b'MM\x00*'):
-                    with rasterio.open(BytesIO(response.content)) as src:
-                        arr = src.read(1)
-                        if np.issubdtype(arr.dtype, np.integer):
-                            return arr  # Keep int8 for tid == 0 comparison
-                        return arr.astype(np.float32)
+                    arr, _, _, _ = self._read_exported_tiff_array(response.content)
+                    return arr
                 else:
                     img = Image.open(BytesIO(response.content))
                     return np.array(img.convert('L') if img.mode in ('RGB', 'RGBA') else img, dtype=np.float32)

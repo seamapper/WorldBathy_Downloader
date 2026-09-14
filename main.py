@@ -27,7 +27,7 @@ All rights reserved.
 
 See LICENSE file for full license text.
 """
-__version__ = "2026.06" 
+__version__ = "2026.08" 
 
 import sys
 import os
@@ -67,6 +67,7 @@ class ServiceInfoLoader(QThread):
     """Thread for loading service information asynchronously."""
     loaded = pyqtSignal(dict)  # Emits extent dict and raster functions
     error = pyqtSignal(str)  # Emits error message
+    statusMessage = pyqtSignal(str)
     
     def __init__(self, base_url):
         super().__init__()
@@ -76,6 +77,7 @@ class ServiceInfoLoader(QThread):
         """Load service information from REST endpoint."""
         try:
             url = f"{self.base_url}?f=json"
+            self.statusMessage.emit(f"Service REST (metadata): {url}")
             response = requests.get(url, timeout=15)
             response.raise_for_status()
             data = response.json()
@@ -127,10 +129,10 @@ class MainWindow(QMainWindow):
         # GEBCO 2025: everything in GCS (EPSG:4326), full extent to poles
         _world_4326 = (-180.0, -90.0, 180.0, 90.0)
         self.data_sources = {
-            "GEBCO 2025": {
-                "url": "https://gis.ccom.unh.edu/server/rest/services/GEBCO2025/GEBCO_2025_IS/ImageServer",
-                "display_url": "https://gis.ccom.unh.edu/server/rest/services/GEBCO/GEBCO_2025_Depths_Haxby_GCS/MapServer",
-                "land_display_url": "https://gis.ccom.unh.edu/server/rest/services/GEBCO/GEBCO_2025_Land_Grey_GCS/MapServer",
+            "GEBCO 2026": {
+                "url": "https://gis.ccom.unh.edu/server/rest/services/GEBCO2026/gebco_2026_IS/ImageServer",
+                "display_url": "https://gis.ccom.unh.edu/server/rest/services/GEBCO/GEBCO_2026_Depths_Haxby_GCS/MapServer",
+                "land_display_url": "https://gis.ccom.unh.edu/server/rest/services/GEBCO/GEBCO_2026_Land_Grey_GCS/MapServer",
                 "bathymetry_raster_function": "None",
                 "hillshade_raster_function": "None",
                 "default_extent": _world_4326,
@@ -138,13 +140,15 @@ class MainWindow(QMainWindow):
                 "native_resolution_only": True,
                 "native_pixel_size_degrees": 0.004166666666666667,
                 "show_output_data_types": True,
-                "attribution": "GEBCO Compilation Group (2025) GEBCO 2025 Grid (doi:10.5285/37c52e96-24ea-67ce-e063-7086abc05f29)",
-                "attribution_url": "https://www.bodc.ac.uk/data/published_data_library/catalogue/10.5285/37c52e96-24ea-67ce-e063-7086abc05f29",
+                "ignore_source_nodata": True,
+                "download_filename_prefix": "GEBCO_2026",
+                "attribution": 'GEBCO Bathymetric Compilation Group 2026. The GEBCO_2026 Grid - a continuous terrain model for oceans and land at 15 arc-second intervals. NERC EDS British Oceanographic Data Centre NOC. doi:10.5285/4f68d5c7-45eb-f999-e063-7086abc036fa',
+                "attribution_url": "https://www.bodc.ac.uk/data/published_data_library/catalogue/10.5285/4f68d5c7-45eb-f999-e063-7086abc036fa",
             },
-            "GEBCO 2025 TID": {
-                "url": "https://gis.ccom.unh.edu/server/rest/services/GEBCO2025/GEBCO_2025_TID_IS/ImageServer",
-                "display_url": "https://gis.ccom.unh.edu/server/rest/services/GEBCO/GEBCO_2025_TID_GCS/MapServer",
-                "land_display_url": "https://gis.ccom.unh.edu/server/rest/services/GEBCO/GEBCO_2025_Land_Grey_GCS/MapServer",
+            "GEBCO 2026 TID": {
+                "url": "https://gis.ccom.unh.edu/server/rest/services/GEBCO2026/gebco_2026_tid_IS/ImageServer",
+                "display_url": "https://gis.ccom.unh.edu/server/rest/services/GEBCO2026/GEBCO_2026_TID_GCS/MapServer",
+                "land_display_url": "https://gis.ccom.unh.edu/server/rest/services/GEBCO/GEBCO_2026_Land_Grey_GCS/MapServer",
                 "bathymetry_raster_function": "None",
                 "hillshade_raster_function": "None",
                 "default_extent": _world_4326,
@@ -152,13 +156,14 @@ class MainWindow(QMainWindow):
                 "native_resolution_only": True,
                 "native_pixel_size_degrees": 0.004166666666666667,
                 "show_output_data_types": False,
-                "download_filename_prefix": "GEBCO_2025_TID",
-                "attribution": "GEBCO Compilation Group (2025) GEBCO 2025 Grid (doi:10.5285/37c52e96-24ea-67ce-e063-7086abc05f29)",
-                "attribution_url": "https://www.bodc.ac.uk/data/published_data_library/catalogue/10.5285/37c52e96-24ea-67ce-e063-7086abc05f29",
+                "ignore_source_nodata": True,
+                "download_filename_prefix": "GEBCO_2026_TID",
+                "attribution": 'GEBCO Bathymetric Compilation Group 2026. The GEBCO_2026 Grid - a continuous terrain model for oceans and land at 15 arc-second intervals. NERC EDS British Oceanographic Data Centre NOC. doi:10.5285/4f68d5c7-45eb-f999-e063-7086abc036fa',
+                "attribution_url": "https://www.bodc.ac.uk/data/published_data_library/catalogue/10.5285/4f68d5c7-45eb-f999-e063-7086abc036fa",
             },
             "NCEI Multibeam Mosaic Raw": {
                 "url": "https://gis.ngdc.noaa.gov/arcgis/rest/services/multibeam_mosaics/multibeam_mosaic_raw/ImageServer",
-                "land_display_url": "https://gis.ccom.unh.edu/server/rest/services/GEBCO/GEBCO_2025_Land_Grey_GCS/MapServer",
+                "land_display_url": "https://gis.ccom.unh.edu/server/rest/services/GEBCO/GEBCO_2026_Land_Grey_GCS/MapServer",
                 "bathymetry_raster_function": "ColorHillshadeHaxby_8000-0",
                 "hillshade_raster_function": "None",
                 "default_extent": _world_4326,
@@ -166,6 +171,7 @@ class MainWindow(QMainWindow):
                 "native_resolution_only": True,
                 "native_pixel_size_degrees": 8.333333333333334e-4,
                 "show_output_data_types": False,
+                "ignore_source_nodata": False,
                 "configurable_cell_size_degrees": True,
                 "show_bathymetry_only_notice": True,
                 "download_filename_prefix": "multibeam_mosaic_raw",
@@ -174,7 +180,7 @@ class MainWindow(QMainWindow):
             },
             "NCEI Multibeam Mosaic Proc": {
                 "url": "https://gis.ngdc.noaa.gov/arcgis/rest/services/multibeam_mosaics/multibeam_mosaic_processed/ImageServer",
-                "land_display_url": "https://gis.ccom.unh.edu/server/rest/services/GEBCO/GEBCO_2025_Land_Grey_GCS/MapServer",
+                "land_display_url": "https://gis.ccom.unh.edu/server/rest/services/GEBCO/GEBCO_2026_Land_Grey_GCS/MapServer",
                 "bathymetry_raster_function": "ColorHillshadeHaxby_8000-0",
                 "hillshade_raster_function": "None",
                 "default_extent": _world_4326,
@@ -182,6 +188,7 @@ class MainWindow(QMainWindow):
                 "native_resolution_only": True,
                 "native_pixel_size_degrees": 8.333333333333334e-4,
                 "show_output_data_types": False,
+                "ignore_source_nodata": False,
                 "configurable_cell_size_degrees": True,
                 "show_bathymetry_only_notice": True,
                 "download_filename_prefix": "multibeam_mosaic_processed",
@@ -189,7 +196,7 @@ class MainWindow(QMainWindow):
                 "attribution_url": "https://gis.ngdc.noaa.gov/arcgis/rest/services/multibeam_mosaics/multibeam_mosaic_processed/ImageServer",
             },
         }
-        self.current_data_source = "GEBCO 2025"
+        self.current_data_source = "GEBCO 2026"
         self.base_url = self.data_sources[self.current_data_source]["url"]
         # Use known extent as fallback (will be updated when service info loads)
         self.service_extent = self.data_sources[self.current_data_source]["default_extent"]
@@ -284,9 +291,10 @@ class MainWindow(QMainWindow):
         # Data Set Attribution (below Map groupbox)
         attribution_group = QGroupBox("Data Set Attribution")
         attribution_group.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)  # Fixed height, don't expand
-        attribution_group.setMaximumHeight(40)  # Constrain maximum height
+        attribution_group.setMinimumHeight(52)
+        attribution_group.setMaximumHeight(64)  # Room for wrapped attribution text
         attribution_layout = QVBoxLayout()
-        attribution_layout.setContentsMargins(2, 1, 2, 1)  # Very minimal margins (top/bottom: 1px)
+        attribution_layout.setContentsMargins(2, 4, 2, 4)
         attribution_layout.setSpacing(0)  # No spacing between items
         self.attribution_label = ClickableLabel()
         self.attribution_label.setWordWrap(True)
@@ -515,6 +523,7 @@ class MainWindow(QMainWindow):
         self.service_loader = ServiceInfoLoader(self.base_url)
         self.service_loader.loaded.connect(self.on_service_info_loaded)
         self.service_loader.error.connect(self.on_service_info_error)
+        self.service_loader.statusMessage.connect(self.log_message)
         self.service_loader.start()
         
     def on_service_info_loaded(self, service_data):
@@ -1072,10 +1081,9 @@ class MainWindow(QMainWindow):
             if self.map_widget:
                 self.map_widget.set_selection_validity(is_valid)
             
-            # Enable download button unless GEBCO 2025 with no output option selected
+            # Enable download button unless a multi-output source has no type selected
             self.download_btn.setEnabled(True)
-            if (self.current_data_source == "GEBCO 2025" and hasattr(self, 'check_combined') and
-                not (self.check_combined.isChecked() or self.check_bathymetry_only.isChecked() or self.check_land_only.isChecked() or self.check_direct_measurements_only.isChecked() or self.check_direct_unknown_measurements_only.isChecked())):
+            if self._shows_output_data_types() and hasattr(self, "check_combined") and not self._collect_output_type_requests():
                 self.download_btn.setEnabled(False)
             # Make text bold only if this is a user manual selection (not initial dataset bounds)
             is_initial_bounds = False
@@ -1100,6 +1108,54 @@ class MainWindow(QMainWindow):
             if self.map_widget:
                 self.map_widget.set_selection_validity(True)  # Default to valid on error
     
+    def _shows_output_data_types(self):
+        """Return True when the current data source supports multiple output grid types."""
+        return self.data_sources.get(self.current_data_source, {}).get("show_output_data_types", False)
+
+    def _get_output_type_tid_url(self):
+        """Return the TID ImageServer URL for masking bathymetry/land/direct outputs."""
+        tid_name = f"{self.current_data_source} TID"
+        tid_ds = self.data_sources.get(tid_name, {})
+        return tid_ds.get("url")
+
+    def _get_download_filename_prefix(self):
+        """Return the filename prefix for downloaded GeoTIFFs."""
+        ds = self.data_sources.get(self.current_data_source, {})
+        prefix = ds.get("download_filename_prefix")
+        if prefix:
+            return prefix
+        return self.current_data_source.replace(" ", "_")
+
+    def _collect_output_type_requests(self):
+        """Return selected output grid modes for sources with multiple output types."""
+        if not self._shows_output_data_types() or not hasattr(self, "check_combined"):
+            return []
+        requests = []
+        if self.check_combined.isChecked():
+            requests.append(("combined", None))
+        if self.check_bathymetry_only.isChecked():
+            requests.append(("bathymetry_only", None))
+        if self.check_land_only.isChecked():
+            requests.append(("land_only", None))
+        if self.check_direct_measurements_only.isChecked():
+            requests.append(("direct_measurements_only", None))
+        if self.check_direct_unknown_measurements_only.isChecked():
+            requests.append(("direct_unknown_measurements_only", None))
+        return requests
+
+    @staticmethod
+    def _output_mode_filename_suffix(mode):
+        """Map an output mode to its filename suffix."""
+        if mode == "bathymetry_only":
+            return "bathymetry"
+        if mode == "land_only":
+            return "land"
+        if mode == "direct_measurements_only":
+            return "direct"
+        if mode == "direct_unknown_measurements_only":
+            return "direct_unknown"
+        return mode
+
     def _get_native_pixel_size_degrees(self):
         """Return native cell size in degrees from service info or data source config."""
         ds = self.data_sources.get(self.current_data_source, {})
@@ -1625,28 +1681,21 @@ class MainWindow(QMainWindow):
         current_time = datetime.now()
         date_time_str = current_time.strftime("%Y-%m-%d_%H-%M-%S")
         
-        # Build list of requested outputs for GEBCO 2025 (any combination of the three)
-        output_requests = []  # list of (mode, path)
-        tid_url = None
-        if native_only and self.current_data_source == "GEBCO 2025" and hasattr(self, 'check_combined'):
-            if self.check_combined.isChecked():
-                output_requests.append(("combined", None))  # path filled below
-            if self.check_bathymetry_only.isChecked():
-                output_requests.append(("bathymetry_only", None))
-            if self.check_land_only.isChecked():
-                output_requests.append(("land_only", None))
-            if self.check_direct_measurements_only.isChecked():
-                output_requests.append(("direct_measurements_only", None))
-            if self.check_direct_unknown_measurements_only.isChecked():
-                output_requests.append(("direct_unknown_measurements_only", None))
-            if output_requests:
-                tid_url = self.data_sources.get("GEBCO 2025 TID", {}).get("url")
-            if self.current_data_source == "GEBCO 2025" and not output_requests:
-                QMessageBox.warning(self, "No Output Selected", "Select at least one output: Combined Bathymetry && Land, Bathymetry Only, Land Only, Direct Measurements Only, or Direct && Unknown Measurement Only.")
-                return
+        # Build list of requested outputs for multi-type GEBCO sources
+        output_requests = self._collect_output_type_requests()
+        tid_url = self._get_output_type_tid_url() if output_requests else None
+        if self._shows_output_data_types() and not output_requests:
+            QMessageBox.warning(
+                self,
+                "No Output Selected",
+                "Select at least one output: Combined Bathymetry && Land, Bathymetry Only, "
+                "Land Only, Direct Measurements Only, or Direct && Unknown Measurement Only.",
+            )
+            return
         
-        # Resolve output path(s) for GEBCO 2025 (multiple outputs possible)
-        if native_only and ds.get("show_output_data_types", True) and output_requests:
+        filename_prefix = self._get_download_filename_prefix()
+        # Resolve output path(s) for multi-output sources
+        if native_only and self._shows_output_data_types() and output_requests:
             if len(output_requests) > 1:
                 if not self.output_directory or not os.path.isdir(self.output_directory):
                     QMessageBox.warning(self, "Output Directory Required", "Select an output directory when saving multiple grids.")
@@ -1654,35 +1703,14 @@ class MainWindow(QMainWindow):
                 out_dir = self.output_directory
                 resolved = []
                 for mode, _ in output_requests:
-                    # Use shorter names for certain modes
-                    if mode == "bathymetry_only":
-                        mode_name = "bathymetry"
-                    elif mode == "land_only":
-                        mode_name = "land"
-                    elif mode == "direct_measurements_only":
-                        mode_name = "direct"
-                    elif mode == "direct_unknown_measurements_only":
-                        mode_name = "direct_unknown"
-                    else:
-                        mode_name = mode
-                    fn = f"GEBCO_2025_{mode_name}_{date_time_str}.tif"
+                    mode_name = self._output_mode_filename_suffix(mode)
+                    fn = f"{filename_prefix}_{mode_name}_{date_time_str}.tif"
                     resolved.append((mode, os.path.join(out_dir, fn)))
                 output_requests = resolved
             else:
-                # Single output
                 mode = output_requests[0][0]
-                # Use shorter names for certain modes
-                if mode == "bathymetry_only":
-                    mode_name = "bathymetry"
-                elif mode == "land_only":
-                    mode_name = "land"
-                elif mode == "direct_measurements_only":
-                    mode_name = "direct"
-                elif mode == "direct_unknown_measurements_only":
-                    mode_name = "direct_unknown"
-                else:
-                    mode_name = mode
-                default_name = f"GEBCO_2025_{mode_name}_{date_time_str}.tif"
+                mode_name = self._output_mode_filename_suffix(mode)
+                default_name = f"{filename_prefix}_{mode_name}_{date_time_str}.tif"
                 if self.output_directory and os.path.isdir(self.output_directory):
                     output_path = os.path.join(self.output_directory, default_name)
                 else:
@@ -1690,7 +1718,7 @@ class MainWindow(QMainWindow):
                     if not output_path:
                         return
                 output_requests = [(mode, output_path)]
-        elif native_only and not ds.get("show_output_data_types", True):
+        elif native_only and not self._shows_output_data_types():
             prefix = ds.get("download_filename_prefix", "bathymetry")
             if ds.get("configurable_cell_size_degrees"):
                 default_filename = f"{prefix}_{cell_size_for_filename}deg_{date_time_str}.tif"
@@ -1704,7 +1732,7 @@ class MainWindow(QMainWindow):
                     return
             output_requests = [("combined", output_path)]
         elif native_only:
-            default_filename = f"GEBCO_2025_{date_time_str}.tif"
+            default_filename = f"{filename_prefix}_{date_time_str}.tif"
             if self.output_directory and os.path.isdir(self.output_directory):
                 output_path = os.path.join(self.output_directory, default_filename)
             else:
@@ -1731,6 +1759,7 @@ class MainWindow(QMainWindow):
         use_tile_download = self.tile_download_checkbox.isChecked()
         
         max_size = 14000
+        ignore_source_nodata = ds.get("ignore_source_nodata", False)
         if native_only:
             self.downloader = BathymetryDownloader(
                 self.base_url,
@@ -1743,7 +1772,8 @@ class MainWindow(QMainWindow):
                 bbox_in_4326=True,
                 pixel_size_degrees=pixel_size_degrees,
                 tid_url=tid_url,
-                output_requests=output_requests
+                output_requests=output_requests,
+                ignore_source_nodata=ignore_source_nodata,
             )
         else:
             self.downloader = BathymetryDownloader(
@@ -1753,7 +1783,8 @@ class MainWindow(QMainWindow):
                 output_crs,
                 pixel_size=cell_size,
                 max_size=max_size,
-                use_tile_download=use_tile_download
+                use_tile_download=use_tile_download,
+                ignore_source_nodata=ignore_source_nodata,
             )
         self.downloader.progress.connect(self.progress_bar.setValue)
         self.downloader.status.connect(self.on_status_update)

@@ -16,6 +16,12 @@ from PIL import Image
 import numpy as np
 import math
 import pyproj
+from urllib.parse import urlencode
+
+
+def _format_rest_url(url, params):
+    """Build a full REST request URL for activity log display."""
+    return f"{url}?{urlencode(params)}"
 
 # Web Mercator constants for tile math (EPSG:3857)
 _WEB_MERCATOR_HALF = 20037508.34
@@ -26,6 +32,7 @@ class BasemapLoader(QThread):
     """Load World Imagery basemap by fetching and compositing tiles from the tile endpoint.
     View extent is in GCS (4326); tiles are in Web Mercator (3857) scheme."""
     tileLoaded = pyqtSignal(QPixmap)
+    statusMessage = pyqtSignal(str)
     
     def __init__(self, bbox_4326, size):
         super().__init__()
@@ -64,6 +71,9 @@ class BasemapLoader(QThread):
             col_max = max(0, min(col_max, n - 1))
             row_min = max(0, min(row_min, n - 1))
             row_max = max(0, min(row_max, n - 1))
+            self.statusMessage.emit(
+                f"Map REST (World Imagery tiles): {self.base_url}/tile/{level}/{{row}}/{{col}}"
+            )
             cols = col_max - col_min + 1
             rows = row_max - row_min + 1
             composite = Image.new("RGB", (int(cols * _TILE_SIZE), int(rows * _TILE_SIZE)), (128, 128, 128))
@@ -92,14 +102,16 @@ class BasemapLoader(QThread):
 class MapTileLoader(QThread):
     """Thread for loading map tiles asynchronously."""
     tileLoaded = pyqtSignal(QPixmap, float, float, float, float)  # pixmap, xmin, ymin, xmax, ymax
+    statusMessage = pyqtSignal(str)
     
-    def __init__(self, base_url, bbox, size, raster_function="Haxby Percent Clip DRA", bbox_sr=None):
+    def __init__(self, base_url, bbox, size, raster_function="Haxby Percent Clip DRA", bbox_sr=None, purpose="map display"):
         super().__init__()
         self.base_url = base_url
         self.bbox = bbox  # (xmin, ymin, xmax, ymax)
         self.size = size  # (width, height)
         self.raster_function = raster_function
         self.bbox_sr = bbox_sr
+        self.purpose = purpose
         
     def run(self):
         """Load tile from ArcGIS ImageServer."""
@@ -127,9 +139,8 @@ class MapTileLoader(QThread):
                 params["renderingRule"] = json.dumps(rendering_rule)
                 print(f"Using raster function: {self.raster_function}")
             
-            # Build full URL for debugging
-            from urllib.parse import urlencode
-            full_url = f"{url}?{urlencode(params)}"
+            full_url = _format_rest_url(url, params)
+            self.statusMessage.emit(f"Map REST ({self.purpose}): {full_url}")
             print(f"Full URL: {full_url}")
             print(f"Requesting: {url} with params: {params}")
             
@@ -198,12 +209,13 @@ class MapServerLoader(QThread):
     tileLoaded = pyqtSignal(QPixmap, float, float, float, float)  # pixmap, west, south, east, north
     statusMessage = pyqtSignal(str)  # Status/log messages for Activity Log
 
-    def __init__(self, map_server_url, bbox_4326, size, transparent=False):
+    def __init__(self, map_server_url, bbox_4326, size, transparent=False, purpose="map display"):
         super().__init__()
         self.map_server_url = map_server_url.rstrip("/")
         self.bbox_4326 = bbox_4326  # (west, south, east, north) in degrees
         self.size = size
         self.transparent = transparent  # Whether to request transparent PNG
+        self.purpose = purpose
         self.max_retries = 3
         self.retry_delay_seconds = 1.0
 
@@ -225,6 +237,7 @@ class MapServerLoader(QThread):
                 "f": "image",
                 "transparent": "true" if self.transparent else "false",
             }
+            self.statusMessage.emit(f"Map REST ({self.purpose}): {_format_rest_url(url, params)}")
             response = None
             for attempt in range(1, self.max_retries + 1):
                 try:
@@ -409,7 +422,7 @@ class MapWidget(QWidget):
         if not self.land_display_url:
             return
         print("Loading land basemap (GCS)...")
-        self.basemap_loader = MapServerLoader(self.land_display_url, requested_extent, size, transparent=False)
+        self.basemap_loader = MapServerLoader(self.land_display_url, requested_extent, size, transparent=False, purpose="land display")
         self.basemap_loader.statusMessage.connect(self.statusMessage.emit)
         self.basemap_loader.tileLoaded.connect(lambda pixmap, *args: self.on_basemap_loaded(pixmap))
         self.basemap_loader.finished.connect(self._check_all_loaders_finished)
@@ -533,7 +546,7 @@ class MapWidget(QWidget):
             self._start_land_basemap_loader(requested_extent, size)
             print("Loading display layer (GCS)...")
             # Bathymetry layer: transparent (transparent=True) so land shows through
-            self.loader = MapServerLoader(self.display_url, requested_extent, size, transparent=True)
+            self.loader = MapServerLoader(self.display_url, requested_extent, size, transparent=True, purpose="bathymetry display")
             self.loader.statusMessage.connect(self.statusMessage.emit)
             self.loader.tileLoaded.connect(self.on_tile_loaded)
             self.loader.finished.connect(self.on_loader_finished)
@@ -551,6 +564,7 @@ class MapWidget(QWidget):
         if self.show_basemap:
             print("Loading basemap...")
             self.basemap_loader = BasemapLoader(requested_extent, size)
+            self.basemap_loader.statusMessage.connect(self.statusMessage.emit)
             self.basemap_loader.tileLoaded.connect(self.on_basemap_loaded)
             self.basemap_loader.finished.connect(self._check_all_loaders_finished)
             self._active_loaders.append(self.basemap_loader)
@@ -559,7 +573,11 @@ class MapWidget(QWidget):
         # Load hillshade layer if enabled (as underlay)
         if self.show_hillshade:
             print("Loading hillshade layer...")
-            self.hillshade_loader = MapTileLoader(self.base_url, requested_extent, size, self.hillshade_raster_function, bbox_sr=self.bbox_sr)
+            self.hillshade_loader = MapTileLoader(
+                self.base_url, requested_extent, size, self.hillshade_raster_function,
+                bbox_sr=self.bbox_sr, purpose="hillshade display",
+            )
+            self.hillshade_loader.statusMessage.connect(self.statusMessage.emit)
             self.hillshade_loader.tileLoaded.connect(self.on_hillshade_loaded)
             self.hillshade_loader.finished.connect(self._check_all_loaders_finished)
             self._active_loaders.append(self.hillshade_loader)
@@ -567,8 +585,12 @@ class MapWidget(QWidget):
         
         # Load bathymetry layer (main layer)
         print("Creating MapTileLoader...")
-        self.loader = MapTileLoader(self.base_url, requested_extent, size, self.raster_function, bbox_sr=self.bbox_sr)
+        self.loader = MapTileLoader(
+            self.base_url, requested_extent, size, self.raster_function,
+            bbox_sr=self.bbox_sr, purpose="bathymetry display",
+        )
         print("Connecting signals...")
+        self.loader.statusMessage.connect(self.statusMessage.emit)
         self.loader.tileLoaded.connect(self.on_tile_loaded)
         self.loader.finished.connect(self.on_loader_finished)
         self.loader.finished.connect(self._check_all_loaders_finished)
